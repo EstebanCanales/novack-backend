@@ -1,53 +1,43 @@
 import {
-	Entity,
-	PrimaryGeneratedColumn,
-	Column,
-	CreateDateColumn,
-	UpdateDateColumn,
-	ManyToOne,
-} from "typeorm";
-import { Supplier } from "./supplier.entity";
-import { Visitor } from "./visitor.entity";
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import { Supplier } from './';
+import { Visitor } from './';
 
-@Entity("card")
+@Entity({ name: 'cards' })
 export class Card {
-	@PrimaryGeneratedColumn("uuid")
-	id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-	@Column("boolean", { default: true })
-	is_active: boolean;
+  @Column({ default: true })
+  is_active: boolean;
 
-	@Column("timestamp", { nullable: true })
-	issued_at: Date;
+  @Column({ nullable: true })
+  issued_at: Date;
 
-	@Column("uuid", { nullable: true })
-	visitor_id: string;
+  @Column({ type: 'numeric', precision: 9, scale: 6, nullable: true })
+  latitude: number;
 
-	@Column("decimal", { precision: 9, scale: 6, nullable: true })
-	latitude: number;
+  @Column({ type: 'numeric', precision: 9, scale: 6, nullable: true })
+  longitude: number;
 
-	@Column("decimal", { precision: 9, scale: 6, nullable: true })
-	longitude: number;
+  @Column({ type: 'numeric', precision: 5, scale: 2, nullable: true })
+  accuracy: number;
 
-	@Column("decimal", { precision: 5, scale: 2, nullable: true })
-	accuracy: number;
+  @CreateDateColumn()
+  created_at: Date;
 
-	@CreateDateColumn({ type: "timestamp" })
-	created_at: Date;
+  @UpdateDateColumn()
+  updated_at: Date;
 
-	@UpdateDateColumn({ type: "timestamp" })
-	updated_at: Date;
+  @ManyToOne(() => Supplier, (supplier) => supplier.id)
+  supplier: Supplier;
 
-	@ManyToOne(
-		() => Supplier,
-		(supplier) => supplier.cards,
-	)
-	supplier: Supplier;
-
-	@ManyToOne(
-		() => Visitor,
-		(visitor) => visitor.cards,
-		{ nullable: true },
-	)
-	visitor: Visitor;
+  @ManyToOne(() => Visitor, (visitor) => visitor.id)
+  visitor: Visitor;
 }

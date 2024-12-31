@@ -1,33 +1,30 @@
 import {
-	Entity,
-	PrimaryGeneratedColumn,
-	Column,
-	CreateDateColumn,
-	UpdateDateColumn,
-	ManyToOne,
-} from "typeorm";
-import { Supplier } from "./supplier.entity";
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import { Supplier } from './';
 
-@Entity("sensor")
+@Entity({ name: 'sensors' })
 export class Sensor {
-	@PrimaryGeneratedColumn("uuid")
-	id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-	@Column("varchar")
-	location: string;
+  @Column()
+  location: string;
 
-	@Column("varchar")
-	status: string;
+  @Column()
+  status: string;
 
-	@CreateDateColumn({ type: "timestamp" })
-	created_at: Date;
+  @CreateDateColumn()
+  created_at: Date;
 
-	@UpdateDateColumn({ type: "timestamp" })
-	updated_at: Date;
+  @UpdateDateColumn()
+  updated_at: Date;
 
-	@ManyToOne(
-		() => Supplier,
-		(supplier) => supplier.cards,
-	)
-	supplier: Supplier;
+  @ManyToOne(() => Supplier, (supplier) => supplier.id)
+  supplier: Supplier;
 }

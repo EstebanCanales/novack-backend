@@ -1,11 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateSensorDto } from './create-sensor.dto';
 
-export class UpdateSensorDto {
-    @IsString()
-    @IsOptional()
-    location?: string;
-
-    @IsString()
-    @IsOptional()
-    status?: string;
-}
+export class UpdateSensorDto extends PartialType(CreateSensorDto) {}

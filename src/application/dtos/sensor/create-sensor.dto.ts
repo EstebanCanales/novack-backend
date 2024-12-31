@@ -1,4 +1,4 @@
-import { IsString } from 'class-validator';
+import { IsString, IsUUID } from 'class-validator';
 
 export class CreateSensorDto {
     @IsString()
@@ -6,4 +6,7 @@ export class CreateSensorDto {
 
     @IsString()
     status: string;
+
+    @IsUUID()
+    supplier_id: string;
 }

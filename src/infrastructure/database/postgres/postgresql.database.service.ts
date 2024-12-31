@@ -24,17 +24,17 @@ export class PostgresqlDatabaseService implements OnModuleInit {
   async testConnection() {
     try {
       const result = await this.dataSource.query('SELECT NOW()');
-      return { 
-        success: true, 
+      return {
+        success: true,
         timestamp: result[0].now,
-        message: 'Database connection successful'
+        message: 'Database connection successful',
       };
     } catch (error) {
       this.logger.error('Database connection test failed:', error.message);
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: error.message,
-        message: 'Database connection failed'
+        message: 'Database connection failed',
       };
     }
   }
