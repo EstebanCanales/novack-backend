@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PostgresqlDatabaseModule } from './infrastructure/database/postgres/postgresql.database.module';
 import { RedisDatabaseModule } from './infrastructure/database/redis/redis.database.module';
 import { SupplierModule } from './application/modules/supplier.module';
@@ -9,6 +9,8 @@ import { VisitorModule } from './application/modules/visitor.module';
 import { SensorModule } from './application/modules/sensor.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { SecurityModule } from './common/modules/security.module';
+import { EmailModule } from './application/modules/email.module';
+import { AuthModule } from './application/modules/auth.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { SecurityModule } from './common/modules/security.module';
     VisitorModule,
     SensorModule,
     SecurityModule,
+    EmailModule,
+    AuthModule,
   ],
   controllers: [],
   providers: [],

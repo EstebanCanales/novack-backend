@@ -7,6 +7,7 @@ import { Repository } from 'typeorm';
 import { Supplier, Employee } from 'src/domain/entities';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EmployeeService } from './employee.service';
+import { EmailService } from './email.service';
 
 @Injectable()
 export class SupplierService {
@@ -16,6 +17,7 @@ export class SupplierService {
     @InjectRepository(Employee)
     private readonly employeeRepository: Repository<Employee>,
     private readonly employeeService: EmployeeService,
+    private readonly emailService: EmailService,
   ) {}
 
   async create(createSupplierDto: CreateSupplierDto) {
@@ -34,14 +36,31 @@ export class SupplierService {
 
     // Crear el empleado creador
     if (createSupplierDto.supplier_creator) {
+      const temporalPassword = 'Temporal123';
       try {
-        await this.employeeService.create({
+        const employee = await this.employeeService.create({
           name: createSupplierDto.supplier_creator,
           email: createSupplierDto.contact_email,
-          password: 'Temporal123', // Contraseña temporal que deberá ser cambiada
+          password: temporalPassword,
           is_creator: true,
           supplier_id: savedSupplier.id,
         });
+
+        console.log('Empleado creado exitosamente:', employee);
+
+        // Enviar email con la información
+        try {
+          console.log('Intentando enviar email al proveedor...');
+          const emailResult = await this.emailService.sendSupplierCreationEmail(
+            savedSupplier,
+            createSupplierDto.contact_email,
+            temporalPassword,
+          );
+          console.log('Email enviado exitosamente:', emailResult);
+        } catch (emailError) {
+          console.error('Error al enviar el email:', emailError);
+          // No lanzamos el error para no revertir la creación del proveedor
+        }
       } catch (error) {
         // Si falla la creación del empleado, eliminar el proveedor
         await this.supplierRepository.remove(savedSupplier);

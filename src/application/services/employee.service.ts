@@ -143,4 +143,13 @@ export class EmployeeService {
 
     return await this.employeeRepository.remove(employee);
   }
+
+  async findByEmail(email: string) {
+    const employee = await this.employeeRepository.findOne({
+      where: { email },
+      relations: ['supplier'],
+    });
+
+    return employee;
+  }
 }
