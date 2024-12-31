@@ -163,9 +163,20 @@ export class VisitorService {
   }
 
   async findBySupplier(supplier_id: string) {
+    const supplier = await this.supplierRepository.findOne({
+      where: { id: supplier_id },
+    });
+
+    if (!supplier) {
+      throw new BadRequestException('El proveedor no existe');
+    }
+
     return await this.visitorRepository.find({
       where: { supplier: { id: supplier_id } },
       relations: ['supplier', 'card'],
+      order: {
+        check_in_time: 'DESC',
+      },
     });
   }
 }

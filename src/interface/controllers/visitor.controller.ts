@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   HttpStatus,
   HttpCode,
+  Query,
 } from '@nestjs/common';
 import { VisitorService } from '../../application/services/visitor.service';
 import {
@@ -21,6 +22,7 @@ import {
   ApiResponse,
   ApiParam,
   ApiBody,
+  ApiQuery,
 } from '@nestjs/swagger';
 
 @ApiTags('visitors')
@@ -55,6 +57,37 @@ export class VisitorController {
   })
   findAll() {
     return this.visitorService.findAll();
+  }
+
+  @Get('by-supplier')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Obtener historial de visitas por proveedor',
+    description: `Obtiene todas las visitas asociadas a un proveedor específico.
+        - Incluye visitas completadas y en progreso
+        - Ordenadas por fecha de check-in
+        - Incluye detalles del visitante y tarjeta asignada`,
+  })
+  @ApiQuery({
+    name: 'supplier_id',
+    description: 'ID UUID del proveedor',
+    required: true,
+    type: String,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de visitas del proveedor.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'ID de proveedor con formato inválido.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Proveedor no encontrado en el sistema.',
+  })
+  findBySupplier(@Query('supplier_id', new ParseUUIDPipe({ version: '4' })) supplier_id: string) {
+    return this.visitorService.findBySupplier(supplier_id);
   }
 
   @Get(':id')
