@@ -25,6 +25,24 @@ export class Employee {
   @Column({ default: false })
   is_creator: boolean;
 
+  @Column({ default: false })
+  is_2fa_enabled: boolean;
+
+  @Column({ nullable: true })
+  two_factor_secret?: string;
+
+  @Column({ nullable: true })
+  two_factor_recovery_codes?: string;
+
+  @Column({ default: false })
+  is_email_verified: boolean;
+
+  @Column({ nullable: true })
+  email_verification_token?: string;
+
+  @Column({ nullable: true })
+  email_verification_expires?: Date;
+
   @CreateDateColumn()
   created_at: Date;
 

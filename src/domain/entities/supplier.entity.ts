@@ -35,7 +35,7 @@ export class Supplier {
   logo_url: string;
 
   @Column()
-  additinal_info: string;
+  additional_info: string;
 
   @Column({ default: false })
   is_subscribed: boolean;

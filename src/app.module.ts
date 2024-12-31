@@ -11,6 +11,8 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { SecurityModule } from './common/modules/security.module';
 import { EmailModule } from './application/modules/email.module';
 import { AuthModule } from './application/modules/auth.module';
+import { TwoFactorAuthModule } from './application/modules/two-factor-auth.module';
+import { EmailVerificationModule } from './application/modules/email-verification.module';
 
 @Module({
   imports: [
@@ -33,6 +35,8 @@ import { AuthModule } from './application/modules/auth.module';
     SecurityModule,
     EmailModule,
     AuthModule,
+    TwoFactorAuthModule,
+    EmailVerificationModule,
   ],
   controllers: [],
   providers: [],

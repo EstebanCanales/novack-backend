@@ -9,7 +9,9 @@ export class EmailService {
   private readonly adminEmail: string = 'jack.bright.director@gmail.com';
 
   constructor(private readonly configService: ConfigService) {
-    this.resend = new Resend(this.configService.get<string>('RESEND_API_KEY'));
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    console.log('Resend API Key:', apiKey);
+    this.resend = new Resend(apiKey);
   }
 
   async sendSupplierCreationEmail(
@@ -246,8 +248,8 @@ export class EmailService {
   async send2FASetupEmail(
     to: string,
     employeeName: string,
-    qrCodeUrl: string,
-    setupCode: string,
+    qrCodeUrl: string | null,
+    code: string,
   ) {
     const { data, error } = await this.resend.emails.send({
       from: 'SP-CEDES <no-reply@spcedes.com>',
@@ -259,28 +261,16 @@ export class EmailService {
           
           <p>Hola ${employeeName},</p>
           
-          <p>Has solicitado activar la autenticación de dos factores (2FA) para tu cuenta. 
-          Sigue los pasos a continuación para completar la configuración:</p>
-          
-          <ol style="margin: 20px 0;">
-            <li>Descarga una aplicación de autenticación como Google Authenticator o Authy</li>
-            <li>Escanea el código QR a continuación con la aplicación:</li>
-          </ol>
-          
-          <div style="text-align: center; margin: 20px 0;">
-            <img src="${qrCodeUrl}" alt="Código QR para 2FA" style="max-width: 200px;"/>
-          </div>
-          
-          <p>Si no puedes escanear el código QR, puedes usar este código de configuración manual:</p>
+          <p>Has solicitado activar la autenticación de dos factores (2FA) para tu cuenta.</p>
           
           <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: center;">
-            <code style="font-size: 1.2em;">${setupCode}</code>
+            <p style="font-size: 1.2em; margin-bottom: 10px;">Tu código de verificación es:</p>
+            <code style="font-size: 2em; color: #007bff;">${code}</code>
           </div>
           
           <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
             <p style="color: #856404; margin: 0;">
-              <strong>⚠️ Importante:</strong> Guarda una copia de tus códigos de respaldo en un lugar seguro.
-              Los necesitarás si pierdes acceso a tu dispositivo de autenticación.
+              <strong>⚠️ Importante:</strong> Mantén este código seguro y no lo compartas con nadie.
             </p>
           </div>
           
@@ -297,6 +287,121 @@ export class EmailService {
 
     if (error) {
       throw new Error(`Error al enviar email: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async sendEmailVerification(
+    to: string,
+    employeeName: string,
+    verificationToken: string,
+  ) {
+    console.log('Enviando email de verificación:', {
+      to,
+      employeeName,
+      verificationToken,
+    });
+
+    const baseUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    console.log('Frontend URL:', baseUrl);
+    const verificationUrl = `${baseUrl}/verify-email/${verificationToken}`;
+    console.log('Verification URL:', verificationUrl);
+
+    try {
+      const { data, error } = await this.resend.emails.send({
+        from: 'SP-CEDES <no-reply@spcedes.com>',
+        to: [to],
+        subject: 'Verifica tu correo electrónico - SP-CEDES',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #333;">Verifica tu correo electrónico</h1>
+            
+            <p>Hola ${employeeName},</p>
+            
+            <p>Gracias por registrarte en SP-CEDES. Para completar tu registro, por favor verifica tu dirección de correo electrónico:</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${verificationUrl}" 
+                 style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">
+                Verificar correo electrónico
+              </a>
+            </div>
+            
+            <p style="color: #666;">
+              Si no puedes hacer clic en el botón, copia y pega este enlace en tu navegador:
+            </p>
+            
+            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; word-break: break-all;">
+              <a href="${verificationUrl}" style="color: #007bff;">${verificationUrl}</a>
+            </div>
+            
+            <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
+              <p style="color: #856404; margin: 0;">
+                <strong>⚠️ Importante:</strong> Este enlace expirará en 24 horas por razones de seguridad.
+              </p>
+            </div>
+            
+            <p style="color: #666;">
+              Si no solicitaste esta verificación, puedes ignorar este correo.
+            </p>
+            
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #888; font-size: 0.8em;">
+              © ${new Date().getFullYear()} SP-CEDES. Todos los derechos reservados.
+            </div>
+          </div>
+        `,
+      });
+
+      console.log('Respuesta de Resend:', { data, error });
+
+      if (error) {
+        console.error('Error al enviar email de verificación:', error);
+        throw new Error(`Error al enviar email de verificación: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error al enviar email de verificación:', error);
+      throw error;
+    }
+  }
+
+  async sendEmailVerificationSuccess(
+    to: string,
+    employeeName: string,
+  ) {
+    const { data, error } = await this.resend.emails.send({
+      from: 'SP-CEDES <no-reply@spcedes.com>',
+      to: [to],
+      subject: '¡Correo electrónico verificado exitosamente! - SP-CEDES',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #333;">¡Correo verificado exitosamente!</h1>
+          
+          <p>Hola ${employeeName},</p>
+          
+          <p>Tu dirección de correo electrónico ha sido verificada exitosamente. Ahora puedes acceder a todas las funcionalidades de SP-CEDES.</p>
+          
+          <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p style="color: #155724; margin: 0;">
+              <strong>✅ Cuenta verificada:</strong> Ya puedes iniciar sesión y utilizar todas las funciones de la plataforma.
+            </p>
+          </div>
+          
+          <p style="color: #666;">
+            Si tienes alguna pregunta o necesitas ayuda, no dudes en contactarnos.
+          </p>
+          
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #888; font-size: 0.8em;">
+            © ${new Date().getFullYear()} SP-CEDES. Todos los derechos reservados.
+          </div>
+        </div>
+      `,
+    });
+
+    if (error) {
+      throw new Error(`Error al enviar email de verificación exitosa: ${error.message}`);
     }
 
     return data;

@@ -43,7 +43,7 @@ export class UpdateSupplierDto {
 
 	@IsOptional()
 	@IsString()
-	additinal_info?: string;
+	additional_info?: string;
 
 	@IsOptional()
 	@IsBoolean()
