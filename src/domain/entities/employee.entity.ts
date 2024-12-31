@@ -43,6 +43,13 @@ export class Employee {
   @Column({ nullable: true })
   email_verification_expires?: Date;
 
+  @Column({ default: 0 })
+  login_attempts: number;
+
+  @Column({ nullable: true })
+  locked_until?: Date;
+
+
   @CreateDateColumn()
   created_at: Date;
 

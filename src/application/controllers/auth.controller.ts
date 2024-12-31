@@ -16,13 +16,16 @@ export class AuthController {
   })
   @ApiResponse({
     status: 401,
-    description: 'Credenciales inválidas',
+    description: 'Credenciales inválidas o cuenta bloqueada',
   })
   async login(@Body() loginDto: LoginDto) {
     try {
       return await this.authService.login(loginDto.email, loginDto.password);
     } catch (error) {
-      throw new UnauthorizedException('Credenciales inválidas');
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Error al iniciar sesión');
     }
   }
 } 
