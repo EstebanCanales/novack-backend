@@ -28,9 +28,10 @@ async function bootstrap() {
         'Operaciones relacionadas con visitantes y su gestión',
       )
       .addTag(
-        'employees',
+        'Employee',
         'Operaciones relacionadas con empleados de proveedores',
       )
+      .addTag('Sensor', 'Comming soon...')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);

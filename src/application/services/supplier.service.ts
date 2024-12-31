@@ -4,75 +4,54 @@ import {
   UpdateSupplierDto,
 } from 'src/application/dtos/supplier';
 import { Repository } from 'typeorm';
-import { Supplier } from 'src/domain/entities';
+import { Supplier, Employee } from 'src/domain/entities';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EmployeeService } from './employee.service';
-import { CreateEmployeeDto } from '../dtos/employee';
 
 @Injectable()
 export class SupplierService {
   constructor(
     @InjectRepository(Supplier)
     private readonly supplierRepository: Repository<Supplier>,
+    @InjectRepository(Employee)
+    private readonly employeeRepository: Repository<Employee>,
     private readonly employeeService: EmployeeService,
   ) {}
 
-  private async validateSubscriptions(
-    data: Partial<CreateSupplierDto | UpdateSupplierDto>,
-    existingSupplier?: Supplier,
-  ) {
-    const isSubscribed =
-      data.is_subscribed ?? existingSupplier?.is_subscribed ?? false;
+  async create(createSupplierDto: CreateSupplierDto) {
+    // Verificar si ya existe un proveedor con el mismo nombre
+    const existingSupplier = await this.supplierRepository.findOne({
+      where: { supplier_name: createSupplierDto.supplier_name },
+    });
 
-    if (!isSubscribed) {
-      if (data.has_card_subscription || data.has_sensor_subscription) {
+    if (existingSupplier) {
+      throw new BadRequestException('Ya existe un proveedor con ese nombre');
+    }
+
+    // Crear el proveedor
+    const supplier = this.supplierRepository.create(createSupplierDto);
+    const savedSupplier = await this.supplierRepository.save(supplier);
+
+    // Crear el empleado creador
+    if (createSupplierDto.supplier_creator) {
+      try {
+        await this.employeeService.create({
+          name: createSupplierDto.supplier_creator,
+          email: createSupplierDto.contact_email,
+          password: 'Temporal123', // Contraseña temporal que deberá ser cambiada
+          is_creator: true,
+          supplier_id: savedSupplier.id,
+        });
+      } catch (error) {
+        // Si falla la creación del empleado, eliminar el proveedor
+        await this.supplierRepository.remove(savedSupplier);
         throw new BadRequestException(
-          'No se pueden tener suscripciones activas si is_subscribed es false',
+          'Error al crear el empleado creador: ' + error.message,
         );
       }
     }
-  }
 
-  async create(supplierData: CreateSupplierDto) {
-    await this.validateSubscriptions(supplierData);
-
-    if (supplierData.is_subscribed === false) {
-      supplierData.has_card_subscription = false;
-      supplierData.has_sensor_subscription = false;
-    }
-
-    const supplier = this.supplierRepository.create(supplierData);
-    const savedSupplier = await this.supplierRepository.save(supplier);
-
-    const employeeCount = supplierData.employee_count || 0;
-    let firstEmployeeId: string | null = null;
-
-    for (let i = 1; i <= employeeCount; i++) {
-      const employeeData: CreateEmployeeDto = {
-        name: `Employee ${i} - ${supplier.supplier_name}`,
-        email: `employee${i}@${supplier.supplier_name.toLowerCase().replace(/\s+/g, '')}.com`,
-        role: 'employee',
-        is_active: true,
-        supplier_id: savedSupplier.id,
-        supplier_name: supplier.supplier_name,
-      };
-      const createdEmployee = await this.employeeService.create(employeeData);
-
-      if (i === 1) {
-        firstEmployeeId = createdEmployee.id;
-      }
-    }
-
-    if (firstEmployeeId) {
-      await this.supplierRepository.update(savedSupplier.id, {
-        supplier_creator: firstEmployeeId,
-      });
-    }
-
-    return await this.supplierRepository.findOne({
-      where: { id: savedSupplier.id },
-      relations: ['employees'],
-    });
+    return savedSupplier;
   }
 
   async findAll() {
@@ -82,44 +61,52 @@ export class SupplierService {
   }
 
   async findOne(id: string) {
-    return await this.supplierRepository.findOne({
+    const supplier = await this.supplierRepository.findOne({
       where: { id },
       relations: ['employees'],
     });
+
+    if (!supplier) {
+      throw new BadRequestException('El proveedor no existe');
+    }
+
+    return supplier;
   }
 
-  async update(id: string, supplierData: UpdateSupplierDto) {
-    const existingSupplier = await this.findOne(id);
-    if (!existingSupplier) {
-      throw new BadRequestException('Proveedor no encontrado');
+  async update(id: string, updateSupplierDto: UpdateSupplierDto) {
+    const supplier = await this.findOne(id);
+
+    if (
+      updateSupplierDto.supplier_name &&
+      updateSupplierDto.supplier_name !== supplier.supplier_name
+    ) {
+      const existingSupplier = await this.supplierRepository.findOne({
+        where: { supplier_name: updateSupplierDto.supplier_name },
+      });
+
+      if (existingSupplier) {
+        throw new BadRequestException('Ya existe un proveedor con ese nombre');
+      }
     }
 
-    await this.validateSubscriptions(supplierData, existingSupplier);
-
-    // Si is_subscribed es false (ya sea en los datos actuales o existentes), forzar las suscripciones a false
-    const willBeSubscribed =
-      supplierData.is_subscribed ?? existingSupplier.is_subscribed;
-    if (!willBeSubscribed) {
-      supplierData.has_card_subscription = false;
-      supplierData.has_sensor_subscription = false;
-    }
-
-    if (supplierData.supplier_name) {
-      await Promise.all(
-        existingSupplier.employees.map((employee) =>
-          this.employeeService.update(employee.id, {
-            supplier_name: supplierData.supplier_name,
-          }),
-        ),
-      );
-    }
-
-    await this.supplierRepository.update(id, supplierData);
-    return await this.findOne(id);
+    Object.assign(supplier, updateSupplierDto);
+    return await this.supplierRepository.save(supplier);
   }
 
   async remove(id: string) {
     const supplier = await this.findOne(id);
+
+    // Verificar si hay empleados
+    const employees = await this.employeeRepository.find({
+      where: { supplier: { id } },
+    });
+
+    if (employees.length > 0) {
+      throw new BadRequestException(
+        'No se puede eliminar el proveedor porque tiene empleados asociados',
+      );
+    }
+
     return await this.supplierRepository.remove(supplier);
   }
 }

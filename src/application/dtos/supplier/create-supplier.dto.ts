@@ -1,55 +1,116 @@
-import { IsInt, IsBoolean, IsString, IsEmail, ValidateIf, IsNotEmpty, Min } from "class-validator";
+import { IsString, IsEmail, IsBoolean, IsOptional, IsNumber, Min, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateSupplierDto {
+	@ApiProperty({ 
+		description: 'Nombre del proveedor',
+		example: 'Empresa ABC',
+		minLength: 3,
+		maxLength: 100
+	})
 	@IsString()
-	@IsNotEmpty({ message: 'El nombre del proveedor es requerido' })
 	supplier_name: string;
 
-	@IsInt()
-	@Min(1, { message: 'Debe haber al menos un empleado' })
-	@IsNotEmpty({ message: 'La cantidad de empleados es requerida' })
-	employee_count: number;
+	@ApiProperty({ 
+		description: 'Nombre del empleado que crea el proveedor (será registrado como creador)',
+		example: 'Juan Pérez',
+		minLength: 3,
+		maxLength: 100
+	})
+	@IsString()
+	supplier_creator: string;
 
-	@IsInt()
-	@Min(1, { message: 'Debe haber al menos una tarjeta' })
-	@IsNotEmpty({ message: 'La cantidad de tarjetas es requerida' })
-	card_count: number;
-
-	@IsEmail({}, { message: 'El correo electrónico debe ser válido' })
-	@IsNotEmpty({ message: 'El correo electrónico es requerido' })
+	@ApiProperty({ 
+		description: 'Correo electrónico de contacto del proveedor',
+		example: 'contacto@empresa.com',
+		format: 'email'
+	})
+	@IsEmail()
 	contact_email: string;
 
+	@ApiProperty({ 
+		description: 'Número de teléfono del proveedor (9 dígitos)',
+		example: '987654321',
+		pattern: '^[0-9]{9}$'
+	})
 	@IsString()
-	@IsNotEmpty({ message: 'El número de teléfono es requerido' })
+	@Matches(/^[0-9]{9}$/, { message: 'El teléfono debe tener 9 dígitos' })
 	phone_number: string;
 
+	@ApiProperty({ 
+		description: 'Dirección física del proveedor',
+		example: 'Av. Principal 123, Lima',
+		minLength: 5,
+		maxLength: 200
+	})
 	@IsString()
-	@IsNotEmpty({ message: 'La dirección es requerida' })
 	address: string;
 
+	@ApiProperty({ 
+		description: 'Descripción general del proveedor',
+		example: 'Empresa dedicada a servicios tecnológicos',
+		minLength: 10,
+		maxLength: 500
+	})
 	@IsString()
-	@IsNotEmpty({ message: 'La descripción es requerida' })
 	description: string;
 
+	@ApiProperty({ 
+		description: 'URL del logo del proveedor',
+		example: 'https://empresa.com/logo.png',
+		format: 'uri'
+	})
 	@IsString()
-	@IsNotEmpty({ message: 'La URL del logo es requerida' })
 	logo_url: string;
 
+	@ApiPropertyOptional({ 
+		description: 'Información adicional del proveedor',
+		example: 'Horario de atención: L-V 9am-6pm',
+		default: ''
+	})
 	@IsString()
-	@IsNotEmpty({ message: 'La información adicional es requerida' })
-	additinal_info: string;
+	@IsOptional()
+	additinal_info?: string;
 
+	@ApiProperty({ 
+		description: 'Indica si el proveedor tiene una suscripción activa',
+		example: true,
+		default: false
+	})
 	@IsBoolean()
-	@IsNotEmpty({ message: 'El estado de suscripción es requerido' })
 	is_subscribed: boolean;
 
+	@ApiProperty({ 
+		description: 'Indica si el proveedor tiene suscripción de tarjetas',
+		example: true,
+		default: false
+	})
 	@IsBoolean()
-	@ValidateIf((o) => o.is_subscribed === true)
-	@IsNotEmpty({ message: 'El estado de suscripción de tarjetas es requerido cuando is_subscribed es true' })
 	has_card_subscription: boolean;
 
+	@ApiProperty({ 
+		description: 'Indica si el proveedor tiene suscripción de sensores',
+		example: false,
+		default: false
+	})
 	@IsBoolean()
-	@ValidateIf((o) => o.is_subscribed === true)
-	@IsNotEmpty({ message: 'El estado de suscripción de sensores es requerido cuando is_subscribed es true' })
 	has_sensor_subscription: boolean;
+
+	@ApiProperty({ 
+		description: 'Número de empleados del proveedor',
+		example: 5,
+		minimum: 1
+	})
+	@IsNumber()
+	@Min(1)
+	employee_count: number;
+
+	@ApiProperty({ 
+		description: 'Número de tarjetas asignadas al proveedor',
+		example: 3,
+		minimum: 0
+	})
+	@IsNumber()
+	@Min(0)
+	card_count: number;
 }

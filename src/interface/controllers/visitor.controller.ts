@@ -30,36 +30,15 @@ export class VisitorController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({
-    summary: 'Crear un nuevo visitante',
-    description: `Registra un nuevo visitante en el sistema.
-        - Si hay tarjetas disponibles, se le asignará una automáticamente
-        - Si no hay tarjetas disponibles, quedará en lista de espera
-        - Se validará la existencia del proveedor
-        - Se validarán los formatos de fecha`,
-  })
+  @ApiOperation({ summary: 'Crear un nuevo visitante' })
   @ApiBody({ type: CreateVisitorDto })
   @ApiResponse({
     status: 201,
     description: 'El visitante ha sido creado exitosamente.',
-    schema: {
-      example: {
-        id: '123e4567-e89b-12d3-a456-426614174000',
-        name: 'Juan Pérez',
-        email: 'juan@empresa.com',
-        state: 'in_progress',
-        // ... otros campos
-      },
-    },
   })
   @ApiResponse({
     status: 400,
-    description: `Datos de entrada inválidos. Posibles errores:
-        - Formato de email inválido
-        - Teléfono no tiene 9 dígitos
-        - Fechas inválidas
-        - Proveedor no existe
-        - Proveedor sin suscripción activa`,
+    description: `Datos de entrada inválidos.`,
   })
   create(@Body() createVisitorDto: CreateVisitorDto) {
     return this.visitorService.create(createVisitorDto);
@@ -69,34 +48,10 @@ export class VisitorController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Obtener todos los visitantes',
-    description: `Retorna la lista completa de visitantes.
-        - Incluye visitantes activos e históricos
-        - Incluye información del proveedor asociado
-        - Incluye información de tarjetas asignadas`,
   })
   @ApiResponse({
     status: 200,
     description: 'Lista de todos los visitantes con sus relaciones.',
-    schema: {
-      type: 'array',
-      items: {
-        example: {
-          id: '123e4567-e89b-12d3-a456-426614174000',
-          name: 'Juan Pérez',
-          state: 'in_progress',
-          supplier: {
-            id: '987fcdeb-51a2-43f7-9abc-def012345678',
-            name: 'Empresa ABC',
-          },
-          cards: [
-            {
-              id: 'abc12345-e89b-12d3-a456-426614174000',
-              is_active: true,
-            },
-          ],
-        },
-      },
-    },
   })
   findAll() {
     return this.visitorService.findAll();
@@ -104,13 +59,7 @@ export class VisitorController {
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Obtener un visitante por ID',
-    description: `Busca y retorna un visitante específico por su ID.
-        - Incluye información detallada del visitante
-        - Incluye información del proveedor
-        - Incluye historial de tarjetas asignadas`,
-  })
+  @ApiOperation({ summary: 'Obtener un visitante por ID' })
   @ApiParam({
     name: 'id',
     description: 'ID UUID del visitante',
@@ -119,15 +68,11 @@ export class VisitorController {
   @ApiResponse({
     status: 200,
     description: 'El visitante ha sido encontrado.',
-    schema: {
-      example: {
-        id: '123e4567-e89b-12d3-a456-426614174000',
-        name: 'Juan Pérez',
-        // ... otros campos
-      },
-    },
   })
-  @ApiResponse({ status: 400, description: 'ID con formato inválido.' })
+  @ApiResponse({
+    status: 400,
+    description: 'ID con formato inválido.',
+  })
   @ApiResponse({
     status: 404,
     description: 'Visitante no encontrado en el sistema.',
@@ -246,4 +191,3 @@ export class VisitorController {
     return this.visitorService.checkOut(id);
   }
 }
-
