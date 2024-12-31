@@ -1,64 +1,63 @@
 import {
-	Entity,
-	PrimaryGeneratedColumn,
-	Column,
-	CreateDateColumn,
-	UpdateDateColumn,
-	OneToOne,
-	OneToMany,
-} from "typeorm";
-import { Employee } from "./employee.entity";
-import { SupplierDetails } from "./supplier_details.entity";
-import { Visitor } from "./visitor.entity";
-import { Card } from "./card.entity";
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from 'typeorm';
+import { Employee } from './employee.entity';
 
-@Entity("suppliers")
+@Entity({ name: 'suppliers' })
 export class Supplier {
-	@PrimaryGeneratedColumn("uuid")
-	id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-	@Column("int")
-	employee_count: number;
+  @Column()
+  supplier_name: string;
 
-	@Column("int")
-	card_count: number;
+  @Column({ nullable: true })
+  supplier_creator: string;
 
-	@Column("boolean")
-	is_subscribed: boolean;
+  @Column()
+  contact_email: string;
 
-	@Column("boolean")
-	has_card_subscription: boolean;
+  @Column()
+  phone_number: string;
 
-	@Column("boolean")
-	has_sensor_subscription: boolean;
+  @Column()
+  address: string;
 
-	@CreateDateColumn({ type: "timestamp" })
-	created_at: Date;
+  @Column()
+  description: string;
 
-	@UpdateDateColumn({ type: "timestamp" })
-	updated_at: Date;
+  @Column()
+  logo_url: string;
 
-	@OneToMany(
-		() => Employee,
-		(employee) => employee.supplier,
-	)
-	employees: Employee[];
+  @Column()
+  additinal_info: string;
 
-	@OneToMany(
-		() => Visitor,
-		(visitor) => visitor.supplier,
-	)
-	visitors: Visitor[];
+  @Column({ default: false })
+  is_subscribed: boolean;
 
-	@OneToMany(
-		() => Card,
-		(card) => card.supplier,
-	)
-	cards: Card[];
+  @Column({ default: false })
+  has_card_subscription: boolean;
 
-	@OneToOne(
-		() => SupplierDetails,
-		(detail) => detail.supplier,
-	)
-	details: SupplierDetails;
+  @Column({ default: false })
+  has_sensor_subscription: boolean;
+
+  @Column()
+  employee_count: number;
+
+  @Column()
+  card_count: number;
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
+
+  @OneToMany(() => Employee, (employee) => employee.supplier)
+  employees: Employee[];
 }

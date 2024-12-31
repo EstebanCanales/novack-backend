@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsBoolean, IsOptional } from 'class-validator';
+import { IsString, IsEmail, IsBoolean, IsOptional, IsUUID } from 'class-validator';
 
 export class CreateEmployeeDto {
     @IsString()
@@ -13,4 +13,10 @@ export class CreateEmployeeDto {
     @IsBoolean()
     @IsOptional()
     is_active?: boolean;
+
+    @IsUUID()
+    supplier_id: string;
+
+    @IsString()
+    supplier_name: string;
 }

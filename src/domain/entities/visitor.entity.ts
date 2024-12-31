@@ -1,61 +1,59 @@
 import {
-	Entity,
-	PrimaryGeneratedColumn,
-	Column,
-	CreateDateColumn,
-	UpdateDateColumn,
-	ManyToOne,
-	OneToOne,
-	OneToMany,
-	Index,
-} from "typeorm";
-import { Supplier } from "./supplier.entity";
-import { VisitorDetails } from "./visitor_details.entity";
-import { Card } from "./card.entity";
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from 'typeorm';
+import { Supplier } from './supplier.entity';
+import { Card } from './card.entity';
 
-@Entity("visitors")
+@Entity({ name: 'visitors' })
 export class Visitor {
-	@PrimaryGeneratedColumn("uuid")
-	id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-	@Column("varchar")
-	name: string;
+  @Column()
+  name: string;
 
-	@Column("varchar")
-	email: string;
+  @Column()
+  email: string;
 
-	@Column("varchar")
-	phone: string;
+  @Column()
+  phone: string;
 
-	@Index()
-	@Column("timestamp")
-	check_in_time: Date;
+  @Column()
+  location: string;
 
-	@Index()
-	@Column("timestamp")
-	check_out_time: Date;
+  @Column({ type: 'json', default: { invitado1: 'ninguno' } })
+  complaints: Record<string, string>;
 
-	@CreateDateColumn({ type: "timestamp" })
-	created_at: Date;
+  @Column({ default: 'pendiente' })
+  state: string;
 
-	@UpdateDateColumn({ type: "timestamp" })
-	updated_at: Date;
+  @Column()
+  appointment: string;
 
-	@ManyToOne(
-		() => Supplier,
-		(supplier) => supplier.visitors,
-	)
-	supplier: Supplier;
+  @Column()
+  appointment_description: string;
 
-	@OneToMany(
-		() => Card,
-		(card) => card.visitor,
-	)
-	cards: Card[];
+  @Column({ type: 'timestamp' })
+  check_in_time: Date;
 
-	@OneToOne(
-		() => VisitorDetails,
-		(details) => details.visitor,
-	)
-	details: VisitorDetails;
+  @Column({ type: 'timestamp', nullable: true })
+  check_out_time: Date;
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
+
+  @ManyToOne(() => Supplier, (supplier) => supplier.id)
+  supplier: Supplier;
+
+  @OneToMany(() => Card, (card) => card.visitor)
+  cards: Card[];
 }

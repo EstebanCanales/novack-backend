@@ -1,39 +1,39 @@
 import {
-	Entity,
-	PrimaryGeneratedColumn,
-	Column,
-	CreateDateColumn,
-	UpdateDateColumn,
-	ManyToOne,
-} from "typeorm";
-import { Supplier } from "./supplier.entity";
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import { Supplier } from './';
 
-@Entity("employees")
+@Entity({ name: 'employees' })
 export class Employee {
-	@PrimaryGeneratedColumn("uuid")
-	id: string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-	@Column("varchar")
-	name: string;
+  @Column({ nullable: true })
+  name: string;
 
-	@Column("varchar", { unique: true })
-	email: string;
+  @Column({ nullable: true })
+  supplier_name: string;
 
-	@Column("varchar")
-	role: string;
+  @Column({ nullable: true })
+  email: string;
 
-	@Column("boolean", { default: true })
-	is_active: boolean;
+  @Column({ nullable: true })
+  role: string;
 
-	@CreateDateColumn({ type: "timestamp" })
-	created_at: Date;
+  @Column({ default: false })
+  is_active: boolean;
 
-	@UpdateDateColumn({ type: "timestamp" })
-	updated_at: Date;
+  @CreateDateColumn()
+  created_at: Date;
 
-	@ManyToOne(
-		() => Supplier,
-		(supplier) => supplier.employees,
-	)
-	supplier: Supplier;
+  @UpdateDateColumn()
+  updated_at: Date;
+
+  @ManyToOne(() => Supplier, (supplier) => supplier.id)
+  supplier: Supplier;
 }

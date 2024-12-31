@@ -1,23 +1,4 @@
-import { IsString, IsEmail, IsDateString, IsOptional } from 'class-validator';
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateVisitorDto } from './create-visitor.dto';
 
-export class UpdateVisitorDto {
-    @IsString()
-    @IsOptional()
-    name?: string;
-
-    @IsEmail()
-    @IsOptional()
-    email?: string;
-
-    @IsString()
-    @IsOptional()
-    phone?: string;
-
-    @IsDateString()
-    @IsOptional()
-    check_in_time?: Date;
-
-    @IsDateString()
-    @IsOptional()
-    check_out_time?: Date;
-}
+export class UpdateVisitorDto extends PartialType(CreateVisitorDto) {}
