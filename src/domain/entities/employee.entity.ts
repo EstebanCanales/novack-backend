@@ -6,27 +6,24 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Supplier } from './';
+import { Supplier } from './supplier.entity';
 
 @Entity({ name: 'employees' })
 export class Employee {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ nullable: true })
+  @Column()
   name: string;
 
-  @Column({ nullable: true })
-  supplier_name: string;
-
-  @Column({ nullable: true })
+  @Column({ unique: true })
   email: string;
 
-  @Column({ nullable: true })
-  role: string;
+  @Column()
+  password: string;
 
   @Column({ default: false })
-  is_active: boolean;
+  is_creator: boolean;
 
   @CreateDateColumn()
   created_at: Date;
@@ -34,6 +31,6 @@ export class Employee {
   @UpdateDateColumn()
   updated_at: Date;
 
-  @ManyToOne(() => Supplier, (supplier) => supplier.id)
+  @ManyToOne(() => Supplier, (supplier) => supplier.employees)
   supplier: Supplier;
 }

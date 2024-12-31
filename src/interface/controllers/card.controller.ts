@@ -10,8 +10,8 @@ import {
   HttpStatus,
   HttpCode,
 } from '@nestjs/common';
-import { CardService } from '../../application/services/card.service';
-import { CreateCardDto, UpdateCardDto } from '../../application/dtos/card';
+import { CardService } from 'src/application/services/card.service';
+import { CreateCardDto, UpdateCardDto } from 'src/application/dtos/card';
 import {
   ApiTags,
   ApiOperation,
@@ -29,33 +29,15 @@ export class CardController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Crear una nueva tarjeta',
-    description: `Registra una nueva tarjeta en el sistema.
-    - La tarjeta se crea con estado activo por defecto
-    - Se valida la existencia del proveedor
-    - Se verifica que el proveedor tenga suscripción de tarjetas activa
-    - Se asigna automáticamente a un visitante en espera si existe`,
   })
   @ApiBody({ type: CreateCardDto })
   @ApiResponse({
     status: 201,
     description: 'La tarjeta ha sido creada exitosamente.',
-    schema: {
-      example: {
-        id: '123e4567-e89b-12d3-a456-426614174000',
-        is_active: true,
-        supplier: {
-          id: '987fcdeb-51a2-43f7-9abc-def012345678',
-          name: 'Empresa ABC',
-        },
-      },
-    },
   })
   @ApiResponse({
     status: 400,
-    description: `Datos de entrada inválidos. Posibles errores:
-    - Proveedor no existe
-    - Proveedor sin suscripción de tarjetas activa
-    - Formato de datos inválido`,
+    description: 'Datos de entrada inválidos. ',
   })
   create(@Body() createCardDto: CreateCardDto) {
     return this.cardService.create(createCardDto);
@@ -102,31 +84,10 @@ export class CardController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Obtener todas las tarjetas',
-    description: `Retorna la lista completa de tarjetas.
-    - Incluye tarjetas activas e inactivas
-    - Incluye información del proveedor asociado
-    - Incluye información del visitante actual si está asignada`,
   })
   @ApiResponse({
     status: 200,
     description: 'Lista de todas las tarjetas con sus relaciones.',
-    schema: {
-      type: 'array',
-      items: {
-        example: {
-          id: '123e4567-e89b-12d3-a456-426614174000',
-          is_active: true,
-          supplier: {
-            id: '987fcdeb-51a2-43f7-9abc-def012345678',
-            name: 'Empresa ABC',
-          },
-          visitor: {
-            id: 'abc12345-e89b-12d3-a456-426614174000',
-            name: 'Juan Pérez',
-          },
-        },
-      },
-    },
   })
   findAll() {
     return this.cardService.findAll();
@@ -136,10 +97,6 @@ export class CardController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Obtener una tarjeta por ID',
-    description: `Busca y retorna una tarjeta específica por su ID.
-    - Incluye información detallada de la tarjeta
-    - Incluye información del proveedor
-    - Incluye historial de visitantes asignados`,
   })
   @ApiParam({
     name: 'id',
@@ -149,13 +106,6 @@ export class CardController {
   @ApiResponse({
     status: 200,
     description: 'La tarjeta ha sido encontrada.',
-    schema: {
-      example: {
-        id: '123e4567-e89b-12d3-a456-426614174000',
-        is_active: true,
-        // ... otros campos
-      },
-    },
   })
   @ApiResponse({ status: 400, description: 'ID con formato inválido.' })
   @ApiResponse({
@@ -170,10 +120,6 @@ export class CardController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Actualizar una tarjeta',
-    description: `Actualiza los datos de una tarjeta existente.
-    - Permite activar/desactivar la tarjeta
-    - No permite modificar el proveedor asociado
-    - No permite modificar asignaciones de visitantes directamente`,
   })
   @ApiParam({
     name: 'id',
@@ -184,13 +130,6 @@ export class CardController {
   @ApiResponse({
     status: 200,
     description: 'La tarjeta ha sido actualizada exitosamente.',
-    schema: {
-      example: {
-        id: '123e4567-e89b-12d3-a456-426614174000',
-        is_active: false,
-        // ... otros campos actualizados
-      },
-    },
   })
   @ApiResponse({
     status: 400,
@@ -211,10 +150,6 @@ export class CardController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Eliminar una tarjeta',
-    description: `Elimina una tarjeta del sistema.
-    - Solo se pueden eliminar tarjetas sin visitante asignado
-    - La eliminación es permanente
-    - Se actualiza el contador de tarjetas del proveedor`,
   })
   @ApiParam({
     name: 'id',
@@ -227,9 +162,7 @@ export class CardController {
   })
   @ApiResponse({
     status: 400,
-    description: `Operación inválida. Posibles errores:
-    - ID con formato inválido
-    - Tarjeta tiene visitante asignado`,
+    description: 'Operación inválida.',
   })
   @ApiResponse({
     status: 404,
