@@ -3,172 +3,103 @@ import {
   Get,
   Post,
   Body,
-  Patch,
+  Put,
   Param,
   Delete,
-  ParseUUIDPipe,
-  HttpStatus,
-  HttpCode,
+  UseGuards,
 } from '@nestjs/common';
-import { CardService } from 'src/application/services/card.service';
-import { CreateCardDto, UpdateCardDto } from 'src/application/dtos/card';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-  ApiBody,
-} from '@nestjs/swagger';
+import { CardService } from '../../application/services/card.service';
+import { CreateCardDto } from '../../application/dtos/card/create-card.dto';
+import { UpdateCardDto } from '../../application/dtos/card/update-card.dto';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { JwtAuthGuard } from 'src/application/guards/jwt-auth.guard';
 
 @ApiTags('cards')
 @Controller('cards')
+@UseGuards(JwtAuthGuard)
 export class CardController {
   constructor(private readonly cardService: CardService) {}
 
   @Post()
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({
-    summary: 'Crear una nueva tarjeta',
-  })
-  @ApiBody({ type: CreateCardDto })
+  @ApiOperation({ summary: 'Crear una nueva tarjeta' })
   @ApiResponse({
     status: 201,
-    description: 'La tarjeta ha sido creada exitosamente.',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Datos de entrada inválidos. ',
+    description: 'La tarjeta ha sido creada exitosamente',
   })
   create(@Body() createCardDto: CreateCardDto) {
     return this.cardService.create(createCardDto);
   }
 
-  @Post('assign/:visitor_id')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Asignar una tarjeta a un visitante' })
-  @ApiParam({ name: 'visitor_id', description: 'ID del visitante' })
-  @ApiResponse({
-    status: 200,
-    description: 'La tarjeta ha sido asignada exitosamente.',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'ID inválido o no hay tarjetas disponibles.',
-  })
-  @ApiResponse({ status: 404, description: 'Visitante no encontrado.' })
-  assignToVisitor(
-    @Param('visitor_id', new ParseUUIDPipe({ version: '4' }))
-    visitor_id: string,
-  ) {
-    return this.cardService.assignCardToVisitor(visitor_id);
-  }
-
-  @Post(':id/release')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Liberar una tarjeta' })
-  @ApiParam({ name: 'id', description: 'ID de la tarjeta' })
-  @ApiResponse({
-    status: 200,
-    description: 'La tarjeta ha sido liberada exitosamente.',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'ID inválido o la tarjeta no está asignada.',
-  })
-  @ApiResponse({ status: 404, description: 'Tarjeta no encontrada.' })
-  releaseCard(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.cardService.releaseCard(id);
-  }
-
   @Get()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Obtener todas las tarjetas',
-  })
+  @ApiOperation({ summary: 'Obtener todas las tarjetas' })
   @ApiResponse({
     status: 200,
-    description: 'Lista de todas las tarjetas con sus relaciones.',
+    description: 'Lista de todas las tarjetas',
   })
   findAll() {
     return this.cardService.findAll();
   }
 
-  @Get(':id')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Obtener una tarjeta por ID',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'ID UUID de la tarjeta',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
+  @Get('available')
+  @ApiOperation({ summary: 'Obtener todas las tarjetas disponibles' })
   @ApiResponse({
     status: 200,
-    description: 'La tarjeta ha sido encontrada.',
+    description: 'Lista de tarjetas disponibles',
   })
-  @ApiResponse({ status: 400, description: 'ID con formato inválido.' })
+  findAvailable() {
+    return this.cardService.findAvailableCards();
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Obtener una tarjeta por ID' })
   @ApiResponse({
-    status: 404,
-    description: 'Tarjeta no encontrada en el sistema.',
+    status: 200,
+    description: 'La tarjeta ha sido encontrada',
   })
-  findOne(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
+  findOne(@Param('id') id: string) {
     return this.cardService.findOne(id);
   }
 
-  @Patch(':id')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Actualizar una tarjeta',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'ID UUID de la tarjeta a actualizar',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
-  @ApiBody({ type: UpdateCardDto })
+  @Put(':id')
+  @ApiOperation({ summary: 'Actualizar una tarjeta' })
   @ApiResponse({
     status: 200,
-    description: 'La tarjeta ha sido actualizada exitosamente.',
+    description: 'La tarjeta ha sido actualizada',
   })
-  @ApiResponse({
-    status: 400,
-    description: 'Datos de entrada inválidos o ID con formato incorrecto.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Tarjeta no encontrada en el sistema.',
-  })
-  update(
-    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-    @Body() updateCardDto: UpdateCardDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateCardDto: UpdateCardDto) {
     return this.cardService.update(id, updateCardDto);
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({
-    summary: 'Eliminar una tarjeta',
-  })
-  @ApiParam({
-    name: 'id',
-    description: 'ID UUID de la tarjeta a eliminar',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
+  @ApiOperation({ summary: 'Eliminar una tarjeta' })
   @ApiResponse({
-    status: 204,
-    description: 'La tarjeta ha sido eliminada exitosamente.',
+    status: 200,
+    description: 'La tarjeta ha sido eliminada',
   })
-  @ApiResponse({
-    status: 400,
-    description: 'Operación inválida.',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Tarjeta no encontrada en el sistema.',
-  })
-  remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
+  remove(@Param('id') id: string) {
     return this.cardService.remove(id);
+  }
+
+  @Post(':card_id/assign/:visitor_id')
+  @ApiOperation({ summary: 'Asignar una tarjeta a un visitante' })
+  @ApiResponse({
+    status: 200,
+    description: 'La tarjeta ha sido asignada al visitante',
+  })
+  assignToVisitor(
+    @Param('card_id') card_id: string,
+    @Param('visitor_id') visitor_id: string,
+  ) {
+    return this.cardService.assignToVisitor(card_id, visitor_id);
+  }
+
+  @Post(':id/unassign')
+  @ApiOperation({ summary: 'Desasignar una tarjeta de un visitante' })
+  @ApiResponse({
+    status: 200,
+    description: 'La tarjeta ha sido desasignada del visitante',
+  })
+  unassignFromVisitor(@Param('id') id: string) {
+    return this.cardService.unassignFromVisitor(id);
   }
 }

@@ -4,11 +4,12 @@ import { VisitorService } from '../services/visitor.service';
 import { VisitorController } from '../../interface/controllers/visitor.controller';
 import { Visitor, Supplier, Card } from 'src/domain/entities';
 import { CardService } from '../services/card.service';
+import { EmailService } from '../services/email.service';
 
 @Module({
     imports: [TypeOrmModule.forFeature([Visitor, Supplier, Card])],
     controllers: [VisitorController],
-    providers: [VisitorService, CardService],
+    providers: [VisitorService, CardService, EmailService],
     exports: [VisitorService],
 })
 export class VisitorModule {} 

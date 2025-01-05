@@ -5,12 +5,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Card, Supplier, Visitor } from 'src/domain/entities';
 
-export enum VisitorState {
-  WAITING = 'waiting',
-  IN_PROGRESS = 'in_progress',
-  COMPLETED = 'completed',
-}
-
 @Injectable()
 export class CardService {
   constructor(
@@ -22,115 +16,70 @@ export class CardService {
     private readonly visitorRepository: Repository<Visitor>,
   ) {}
 
-  private async getAvailableCard(supplier_id: string): Promise<Card | null> {
-    const cards = await this.cardRepository.find({
+  async findAvailableCards(): Promise<Card[]> {
+    return await this.cardRepository.find({
       where: {
-        supplier: { id: supplier_id },
-        visitor: null,
         is_active: true,
+        visitor: null,
       },
-    });
-    return cards.length > 0 ? cards[0] : null;
-  }
-
-  private async getWaitingVisitors(supplier_id: string): Promise<Visitor[]> {
-    return await this.visitorRepository.find({
-      where: {
-        supplier: { id: supplier_id },
-        state: VisitorState.WAITING,
-      },
-      order: {
-        created_at: 'ASC', // Primero en llegar, primero en ser servido
-      },
+      relations: ['supplier'],
     });
   }
 
-  async assignCardToVisitor(visitor_id: string) {
+  async assignToVisitor(card_id: string, visitor_id: string): Promise<Card> {
+    const card = await this.findOne(card_id);
     const visitor = await this.visitorRepository.findOne({
       where: { id: visitor_id },
-      relations: ['supplier'],
+      relations: ['card'],
     });
 
     if (!visitor) {
       throw new BadRequestException('El visitante no existe');
     }
 
-    if (visitor.state === VisitorState.COMPLETED) {
+    if (visitor.state === 'completado') {
       throw new BadRequestException('El visitante ya completó su visita');
     }
 
-    // Verificar si ya tiene una tarjeta asignada
-    const existingCard = await this.cardRepository.findOne({
-      where: { visitor: { id: visitor_id } },
-    });
-
-    if (existingCard) {
-      throw new BadRequestException(
-        'El visitante ya tiene una tarjeta asignada',
-      );
+    if (visitor.card) {
+      throw new BadRequestException('El visitante ya tiene una tarjeta asignada');
     }
 
-    const availableCard = await this.getAvailableCard(visitor.supplier.id);
-
-    if (!availableCard) {
-      // Si no hay tarjetas disponibles, poner al visitante en espera
-      visitor.state = VisitorState.WAITING;
-      await this.visitorRepository.save(visitor);
-      throw new BadRequestException(
-        'No hay tarjetas disponibles. El visitante ha sido puesto en lista de espera.',
-      );
+    if (!card.is_active) {
+      throw new BadRequestException('La tarjeta no está activa');
     }
 
-    // Asignar la tarjeta al visitante
-    availableCard.visitor = visitor;
-    availableCard.issued_at = new Date();
-    await this.cardRepository.save(availableCard);
+    if (card.visitor) {
+      throw new BadRequestException('La tarjeta ya está asignada a otro visitante');
+    }
 
-    // Actualizar el estado del visitante
-    visitor.state = VisitorState.IN_PROGRESS;
+    card.visitor = visitor;
+    card.issued_at = new Date();
+    visitor.state = 'en_progreso';
+
     await this.visitorRepository.save(visitor);
-
-    return availableCard;
+    return await this.cardRepository.save(card);
   }
 
-  async releaseCard(card_id: string) {
+  async unassignFromVisitor(card_id: string): Promise<Card> {
     const card = await this.findOne(card_id);
 
     if (!card.visitor) {
-      throw new BadRequestException(
-        'La tarjeta no está asignada a ningún visitante',
-      );
+      throw new BadRequestException('La tarjeta no está asignada a ningún visitante');
     }
 
-    // Obtener el visitante y supplier antes de desasignar
-    const visitor_id = card.visitor.id;
-    const supplier_id = card.supplier.id;
-
-    // Marcar al visitante como completado
-    await this.visitorRepository.update(visitor_id, {
-      state: VisitorState.COMPLETED,
+    const visitor = await this.visitorRepository.findOne({
+      where: { id: card.visitor.id },
     });
 
-    // Desasignar la tarjeta
-    card.visitor = null;
-    card.issued_at = null;
-    await this.cardRepository.save(card);
-
-    // Intentar asignar la tarjeta al siguiente visitante en espera
-    const waitingVisitors = await this.getWaitingVisitors(supplier_id);
-    if (waitingVisitors.length > 0) {
-      try {
-        await this.assignCardToVisitor(waitingVisitors[0].id);
-      } catch (error) {
-        // Manejar cualquier error en la asignación
-        console.error(
-          'Error al asignar tarjeta al siguiente visitante:',
-          error,
-        );
-      }
+    if (visitor) {
+      visitor.state = 'completado';
+      await this.visitorRepository.save(visitor);
     }
 
-    return card;
+    card.visitor = null;
+    card.issued_at = null;
+    return await this.cardRepository.save(card);
   }
 
   async create(createCardDto: CreateCardDto) {

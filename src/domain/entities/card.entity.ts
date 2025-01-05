@@ -5,9 +5,11 @@ import {
   ManyToOne,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToOne,
+  JoinColumn,
 } from 'typeorm';
-import { Supplier } from './';
-import { Visitor } from './';
+import { Supplier } from './supplier.entity';
+import { Visitor } from './visitor.entity';
 
 @Entity({ name: 'cards' })
 export class Card {
@@ -38,6 +40,7 @@ export class Card {
   @ManyToOne(() => Supplier, (supplier) => supplier.id)
   supplier: Supplier;
 
-  @ManyToOne(() => Visitor, (visitor) => visitor.id)
+  @OneToOne(() => Visitor, (visitor) => visitor.card)
+  @JoinColumn()
   visitor: Visitor;
 }

@@ -4,13 +4,14 @@ import { SupplierController } from "../../interface/controllers/supplier.control
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { Supplier, Employee } from "src/domain/entities";
 import { EmployeeService } from "../services/employee.service";
+import { EmailService } from "../services/email.service";
 
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([Supplier, Employee])
 	],
 	controllers: [SupplierController],
-	providers: [SupplierService, EmployeeService],
+	providers: [SupplierService, EmployeeService, EmailService],
 	exports: [SupplierService]
 })
 export class SupplierModule {}

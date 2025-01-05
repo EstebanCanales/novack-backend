@@ -70,7 +70,7 @@ export class CreateSupplierDto {
 	})
 	@IsString()
 	@IsOptional()
-	additinal_info?: string;
+	additional_info?: string;
 
 	@ApiProperty({ 
 		description: 'Indica si el proveedor tiene una suscripción activa',

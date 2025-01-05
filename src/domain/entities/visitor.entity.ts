@@ -5,7 +5,7 @@ import {
   ManyToOne,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToMany,
+  OneToOne,
 } from 'typeorm';
 import { Supplier } from './supplier.entity';
 import { Card } from './card.entity';
@@ -54,6 +54,6 @@ export class Visitor {
   @ManyToOne(() => Supplier, (supplier) => supplier.id)
   supplier: Supplier;
 
-  @OneToMany(() => Card, (card) => card.visitor)
-  cards: Card[];
+  @OneToOne(() => Card, (card) => card.visitor)
+  card: Card;
 }
