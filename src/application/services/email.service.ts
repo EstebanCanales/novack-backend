@@ -10,7 +10,6 @@ export class EmailService {
 
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('RESEND_API_KEY');
-    console.log('Resend API Key:', apiKey);
     this.resend = new Resend(apiKey);
   }
 
@@ -19,11 +18,6 @@ export class EmailService {
     creatorEmail: string,
     creatorPassword: string,
   ) {
-    console.log('Iniciando envío de email al proveedor:', {
-      supplier_name: supplier.supplier_name,
-      creator_email: creatorEmail,
-    });
-
     try {
       // Email para el creador del proveedor
       const creatorEmailResult = await this.resend.emails.send({
@@ -121,7 +115,10 @@ export class EmailService {
         `,
       });
 
-      console.log('Email enviado al administrador exitosamente:', adminEmailResult);
+      console.log(
+        'Email enviado al administrador exitosamente:',
+        adminEmailResult,
+      );
 
       return { creatorEmailResult, adminEmailResult };
     } catch (error) {
@@ -145,23 +142,30 @@ export class EmailService {
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #333;">¡Bienvenido a SP-CEDES, ${visitorName}!</h1>
           
-          <p>Tu visita ha sido programada para el ${appointmentDate.toLocaleDateString('es-PE', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}.</p>
+          <p>Tu visita ha sido programada para el ${appointmentDate.toLocaleDateString(
+            'es-PE',
+            {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            },
+          )}.</p>
           
           <p>Ubicación de tu visita: <strong>${location}</strong></p>
           
-          ${qrCodeUrl ? `
+          ${
+            qrCodeUrl
+              ? `
             <div style="text-align: center; margin: 20px 0;">
               <p>Tu código QR para acceso:</p>
               <img src="${qrCodeUrl}" alt="Código QR" style="max-width: 200px;"/>
             </div>
-          ` : ''}
+          `
+              : ''
+          }
           
           <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
             <h3 style="color: #333; margin-top: 0;">Recordatorios importantes:</h3>
@@ -207,22 +211,28 @@ export class EmailService {
           
           <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
             <h3 style="color: #333; margin-top: 0;">Detalles de tu visita:</h3>
-            <p><strong>Entrada:</strong> ${checkInTime.toLocaleDateString('es-PE', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}</p>
-            <p><strong>Salida:</strong> ${checkOutTime.toLocaleDateString('es-PE', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}</p>
+            <p><strong>Entrada:</strong> ${checkInTime.toLocaleDateString(
+              'es-PE',
+              {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              },
+            )}</p>
+            <p><strong>Salida:</strong> ${checkOutTime.toLocaleDateString(
+              'es-PE',
+              {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              },
+            )}</p>
             <p><strong>Ubicación:</strong> ${location}</p>
           </div>
           
@@ -303,7 +313,8 @@ export class EmailService {
       verificationToken,
     });
 
-    const baseUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const baseUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
     console.log('Frontend URL:', baseUrl);
     const verificationUrl = `${baseUrl}/verify-email/${verificationToken}`;
     console.log('Verification URL:', verificationUrl);
@@ -357,7 +368,9 @@ export class EmailService {
 
       if (error) {
         console.error('Error al enviar email de verificación:', error);
-        throw new Error(`Error al enviar email de verificación: ${error.message}`);
+        throw new Error(
+          `Error al enviar email de verificación: ${error.message}`,
+        );
       }
 
       return data;
@@ -367,10 +380,7 @@ export class EmailService {
     }
   }
 
-  async sendEmailVerificationSuccess(
-    to: string,
-    employeeName: string,
-  ) {
+  async sendEmailVerificationSuccess(to: string, employeeName: string) {
     const { data, error } = await this.resend.emails.send({
       from: 'SP-CEDES <no-reply@spcedes.com>',
       to: [to],
@@ -401,9 +411,12 @@ export class EmailService {
     });
 
     if (error) {
-      throw new Error(`Error al enviar email de verificación exitosa: ${error.message}`);
+      throw new Error(
+        `Error al enviar email de verificación exitosa: ${error.message}`,
+      );
     }
 
     return data;
   }
-} 
+}
+

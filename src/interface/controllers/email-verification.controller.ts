@@ -15,14 +15,17 @@ import { EmailVerificationService } from '../../application/services/email-verif
 @ApiTags('email-verification')
 @Controller('email-verification')
 export class EmailVerificationController {
-  constructor(private readonly emailVerificationService: EmailVerificationService) {}
+  constructor(
+    private readonly emailVerificationService: EmailVerificationService,
+  ) {}
 
   @Post('send')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Enviar email de verificación',
-    description: 'Envía un email con el enlace de verificación al empleado actual',
+    description:
+      'Envía un email con el enlace de verificación al empleado actual',
   })
   @ApiResponse({
     status: 200,
@@ -43,6 +46,7 @@ export class EmailVerificationController {
     name: 'token',
     description: 'Token de verificación enviado por email',
   })
+
   @ApiResponse({
     status: 200,
     description: 'Email verificado exitosamente',
@@ -66,4 +70,5 @@ export class EmailVerificationController {
     const employeeId = req.user.id;
     return this.emailVerificationService.resendVerificationEmail(employeeId);
   }
-} 
+}
+

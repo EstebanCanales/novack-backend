@@ -1,7 +1,35 @@
-# SP Cedes Backend
+# Novack Backend
 
 ## Description
-Backend service for SP Cedes project built with NestJS.
+Backend service for Novack project built with NestJS. This system provides a robust API for managing access control, employee management, visitor tracking, and security monitoring in corporate environments.
+
+### Key Features
+- 🔐 Authentication and Authorization System
+- 👥 Employee Management
+- 🎫 Access Card Control
+- 📱 Two-Factor Authentication
+- 🏢 Visitor Management
+- 🔍 Security Monitoring
+- 📊 Sensor Data Management
+- 📧 Email Notifications and Verification
+- 🛡️ Rate Limiting Protection
+- 🏭 Supplier Management
+
+### Architecture
+The application follows Clean Architecture principles with a modular design:
+
+- **Application Layer**: Controllers, DTOs, and Services
+- **Domain Layer**: Business entities and core logic
+- **Infrastructure Layer**: Database connections and external services
+- **Interface Layer**: REST API endpoints and controllers
+
+### Technologies
+- NestJS Framework
+- PostgreSQL Database
+- Redis for Caching
+- JWT Authentication
+- TypeORM
+- Docker Containerization
 
 ## Prerequisites
 - Docker
@@ -73,5 +101,3 @@ The project includes:
 ## Environment Variables
 Check `.env.example` for all required environment variables.
 
-## License
-[Your License]
