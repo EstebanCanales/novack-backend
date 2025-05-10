@@ -5,3 +5,5 @@ export * from './supplier.entity';
 export * from './supplier-subscription.entity';
 export * from './visitor.entity';
 export * from './sensor.entity';
+export * from './chat-room.entity';
+export * from './chat-message.entity';
