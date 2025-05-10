@@ -2,12 +2,31 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   try {
     const app = await NestFactory.create(AppModule);
     const port = process.env.PORT || 4000;
+
+    // Aplicar helmet para seguridad de cabeceras HTTP
+    app.use(helmet());
+    
+    // Configurar CSP para prevenir XSS
+    app.use(
+      helmet({
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", 'data:', 'https:'],
+            connectSrc: ["'self'"],
+          },
+        },
+      }),
+    );
 
     const config = new DocumentBuilder()
       .setTitle('SP-CEDES API')
@@ -37,6 +56,7 @@ async function bootstrap() {
       new ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,
+        transform: true,
       }),
     );
 

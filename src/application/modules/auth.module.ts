@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from '../services/auth.service';
@@ -6,12 +6,13 @@ import { AuthController } from '../../interface/controllers/auth.controller';
 import { EmployeeModule } from './employee.module';
 import { JwtStrategy } from '../strategies/jwt.strategy';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Employee, EmployeeAuth } from '../../domain/entities';
+import { Employee, EmployeeAuth, LoginAttempt } from '../../domain/entities';
+import { BruteForceMiddleware } from '../middlewares/brute-force.middleware';
 
 @Module({
   imports: [
     EmployeeModule,
-    TypeOrmModule.forFeature([Employee, EmployeeAuth]),
+    TypeOrmModule.forFeature([Employee, EmployeeAuth, LoginAttempt]),
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
@@ -23,8 +24,14 @@ import { Employee, EmployeeAuth } from '../../domain/entities';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, BruteForceMiddleware],
   exports: [AuthService],
 })
-export class AuthModule {}
+export class AuthModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(BruteForceMiddleware)
+      .forRoutes(AuthController);
+  }
+}
 
