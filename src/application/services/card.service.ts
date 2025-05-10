@@ -1,12 +1,15 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { CreateCardDto } from '../dtos/card';
 import { UpdateCardDto } from '../dtos/card';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 import { Card, CardLocation, Supplier, Visitor } from 'src/domain/entities';
+import { RedisDatabaseService } from 'src/infrastructure/database/redis/redis.database.service';
 
 @Injectable()
 export class CardService {
+  private readonly logger = new Logger(CardService.name);
+
   constructor(
     @InjectRepository(Card)
     private readonly cardRepository: Repository<Card>,
@@ -16,6 +19,7 @@ export class CardService {
     private readonly supplierRepository: Repository<Supplier>,
     @InjectRepository(Visitor)
     private readonly visitorRepository: Repository<Visitor>,
+    private readonly redisService: RedisDatabaseService,
   ) {}
 
   async findAvailableCards(): Promise<Card[]> {
@@ -45,8 +49,24 @@ export class CardService {
     card.longitude = longitude;
     card.accuracy = accuracy;
     await this.cardRepository.save(card);
+    
+    const savedLocation = await this.locationRepository.save(location);
+    
+    // Guardar en caché Redis
+    try {
+      await this.redisService.saveCardLocation(card_id, {
+        id: savedLocation.id,
+        latitude,
+        longitude,
+        accuracy,
+        timestamp: savedLocation.timestamp,
+        card_number: card.card_number
+      });
+    } catch (error) {
+      this.logger.warn(`Error al guardar ubicación de tarjeta en caché: ${error.message}`);
+    }
 
-    return await this.locationRepository.save(location);
+    return savedLocation;
   }
 
   async assignToVisitor(card_id: string, visitor_id: string): Promise<Card> {
@@ -160,9 +180,111 @@ export class CardService {
     return card;
   }
 
-  async findLocationHistory(card_id: string) {
+  async findLocationHistory(card_id: string): Promise<CardLocation[]> {
     const card = await this.findOne(card_id);
-    return card.locations;
+    
+    // Obtener el historial de ubicaciones de la base de datos
+    return this.locationRepository.find({ 
+      where: { card: { id: card_id } },
+      order: { timestamp: 'DESC' }
+    });
+  }
+
+  async getLastLocation(card_id: string): Promise<any> {
+    // Intentar obtener de caché primero
+    try {
+      const cachedLocation = await this.redisService.getCardLocation(card_id);
+      if (cachedLocation) {
+        return cachedLocation;
+      }
+    } catch (error) {
+      this.logger.warn(`Error al obtener ubicación de tarjeta de caché: ${error.message}`);
+    }
+    
+    // Si no está en caché, obtener de base de datos
+    const lastLocationFromDB = await this.locationRepository.findOne({ 
+      where: { card: { id: card_id } },
+      order: { timestamp: 'DESC' }
+    });
+    
+    if (lastLocationFromDB) {
+      // Guardar en caché para futuros accesos
+      try {
+        const card = await this.findOne(card_id);
+        await this.redisService.saveCardLocation(card_id, {
+          id: lastLocationFromDB.id,
+          latitude: lastLocationFromDB.latitude,
+          longitude: lastLocationFromDB.longitude,
+          accuracy: lastLocationFromDB.accuracy,
+          timestamp: lastLocationFromDB.timestamp,
+          card_number: card.card_number
+        });
+      } catch (error) {
+        this.logger.warn(`Error al guardar ubicación de tarjeta en caché: ${error.message}`);
+      }
+      
+      return lastLocationFromDB;
+    }
+    
+    return null;
+  }
+  
+  async getNearbyCards(latitude: number, longitude: number, radius = 100): Promise<any[]> {
+    // Utilizar la función de Redis para obtener tarjetas cercanas
+    try {
+      const nearbyCards = await this.redisService.getNearbyCards(latitude, longitude, radius);
+      if (nearbyCards && nearbyCards.length > 0) {
+        return nearbyCards;
+      }
+    } catch (error) {
+      this.logger.warn(`Error al obtener tarjetas cercanas de caché: ${error.message}`);
+    }
+    
+    // Fallback a la base de datos (búsqueda aproximada)
+    // Nota: esto no es una verdadera búsqueda geoespacial, solo una aproximación
+    const latDelta = radius / 111000; // Aproximado: 1 grado ~ 111km
+    const lngDelta = radius / (111000 * Math.cos(latitude * (Math.PI / 180)));
+    
+    const minLat = latitude - latDelta;
+    const maxLat = latitude + latDelta;
+    const minLng = longitude - lngDelta;
+    const maxLng = longitude + lngDelta;
+    
+    const cards = await this.cardRepository.find({
+      where: {
+        latitude: Between(minLat, maxLat),
+        longitude: Between(minLng, maxLng)
+      }
+    });
+    
+    return cards.map(card => ({
+      id: card.id,
+      card_number: card.card_number,
+      latitude: card.latitude,
+      longitude: card.longitude,
+      accuracy: card.accuracy,
+      // Cálculo aproximado de la distancia
+      distance_meters: this.calculateDistance(
+        latitude, longitude,
+        parseFloat(card.latitude.toString()),
+        parseFloat(card.longitude.toString())
+      )
+    }));
+  }
+  
+  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371000; // Radio de la Tierra en metros
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return Math.round(R * c); // Distancia en metros
   }
 
   async update(id: string, updateCardDto: UpdateCardDto) {

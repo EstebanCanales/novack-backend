@@ -7,10 +7,12 @@ import { ChatService } from '../services/chat.service';
 import { ChatController } from '../../infrastructure/controllers/chat.controller';
 import { ChatGateway } from '../../infrastructure/websockets/chat.gateway';
 import { WsJwtGuard } from '../../infrastructure/guards/ws-jwt.guard';
+import { RedisDatabaseModule } from '../../infrastructure/database/redis/redis.database.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ChatRoom, ChatMessage, Employee, Visitor, Supplier]),
+    RedisDatabaseModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

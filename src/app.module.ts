@@ -41,8 +41,19 @@ import { ChatModule } from './application/modules/chat.module';
     // Rate limiting configuration to prevent abuse
     ThrottlerModule.forRoot([
       {
-        ttl: 60, // Time window in seconds
-        limit: 10, // Maximum number of requests within the time window
+        name: 'login',
+        ttl: 60000, // 1 minuto en milisegundos
+        limit: 5, // 5 intentos por minuto
+      },
+      {
+        name: 'api',
+        ttl: 60000,
+        limit: 20,
+      },
+      {
+        name: 'default',
+        ttl: 60000,
+        limit: 10,
       },
     ]),
     // Programación de tareas

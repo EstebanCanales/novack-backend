@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { CardService } from '../../application/services/card.service';
 import {
@@ -129,5 +130,21 @@ export class CardController {
       locationDto.longitude,
       locationDto.accuracy,
     );
+  }
+
+  @Get('nearby')
+  @UseGuards(AuthGuard)
+  findNearbyCards(
+    @Query('lat') latitude: number,
+    @Query('lng') longitude: number,
+    @Query('radius') radius = 100
+  ) {
+    return this.cardService.getNearbyCards(+latitude, +longitude, +radius);
+  }
+
+  @Get(':id/last-location')
+  @UseGuards(AuthGuard)
+  getLastLocation(@Param('id') id: string) {
+    return this.cardService.getLastLocation(id);
   }
 }

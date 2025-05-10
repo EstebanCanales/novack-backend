@@ -423,8 +423,8 @@ export class ChatService {
     user1Type: 'employee' | 'visitor',
     user2Type: 'employee' | 'visitor'
   ): string {
-    const user1Name = user1.name || (user1Type === 'employee' ? user1.employee_name : 'Visitante');
-    const user2Name = user2.name || (user2Type === 'employee' ? user2.employee_name : 'Visitante');
+    const user1Name = user1.name || (user1Type === 'employee' ? user1.employee_name : 'visitor');
+    const user2Name = user2.name || (user2Type === 'employee' ? user2.employee_name : 'visitor');
     return `Chat: ${user1Name} - ${user2Name}`;
   }
 } 

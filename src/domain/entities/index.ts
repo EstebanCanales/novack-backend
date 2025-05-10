@@ -7,3 +7,4 @@ export * from './visitor.entity';
 export * from './sensor.entity';
 export * from './chat-room.entity';
 export * from './chat-message.entity';
+export * from './login-attempt.entity';

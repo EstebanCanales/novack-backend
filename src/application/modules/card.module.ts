@@ -6,10 +6,12 @@ import { CardController } from '../../interface/controllers/card.controller';
 import { Card, CardLocation, Supplier, Visitor } from 'src/domain/entities';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CardSchedulerModule } from './card-scheduler.module';
+import { RedisDatabaseModule } from '../../infrastructure/database/redis/redis.database.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Card, CardLocation, Supplier, Visitor]),
+    RedisDatabaseModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
