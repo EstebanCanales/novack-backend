@@ -8,7 +8,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../application/guards/jwt-auth.guard';
+import { AuthGuard } from 'src/application/guards/auth.guard';
 import { TwoFactorAuthService } from '../../application/services/two-factor-auth.service';
 import {
   Enable2FADto,
@@ -18,7 +18,7 @@ import {
 
 @ApiTags('2fa')
 @Controller('2fa')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AuthGuard)
 export class TwoFactorAuthController {
   constructor(private readonly twoFactorAuthService: TwoFactorAuthService) {}
 
@@ -41,7 +41,8 @@ export class TwoFactorAuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Activar 2FA',
-    description: 'Activa 2FA para el empleado actual usando el código de 6 dígitos',
+    description:
+      'Activa 2FA para el empleado actual usando el código de 6 dígitos',
   })
   @ApiResponse({
     status: 200,
@@ -71,7 +72,8 @@ export class TwoFactorAuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Desactivar 2FA',
-    description: 'Desactiva 2FA para el empleado actual usando el código de 6 dígitos',
+    description:
+      'Desactiva 2FA para el empleado actual usando el código de 6 dígitos',
   })
   @ApiResponse({
     status: 200,
@@ -81,4 +83,5 @@ export class TwoFactorAuthController {
     const employeeId = req.user.id;
     return this.twoFactorAuthService.disable2FA(employeeId, disable2FADto.code);
   }
-} 
+}
+

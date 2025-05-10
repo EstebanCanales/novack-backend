@@ -2,39 +2,20 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  ManyToOne,
   CreateDateColumn,
   UpdateDateColumn,
   OneToOne,
   JoinColumn,
 } from 'typeorm';
-import { Supplier } from './supplier.entity';
+import { Employee } from './employee.entity';
 
-@Entity({ name: 'employees' })
-export class Employee {
+@Entity({ name: 'employee_auth' })
+export class EmployeeAuth {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column()
-  name: string;
-
-  @Column({ unique: true })
-  email: string;
-
-  @Column({ nullable: true })
-  phone: string;
-
-  @Column({ nullable: true })
-  position: string;
-
-  @Column({ nullable: true })
-  department: string;
-
-  @Column({ nullable: true })
-  profile_image_url?: string;
-
-  @Column({ default: false })
-  is_creator: boolean;
+  password: string;
 
   @Column({ default: false })
   is_2fa_enabled: boolean;
@@ -60,12 +41,16 @@ export class Employee {
   @Column({ nullable: true })
   locked_until?: Date;
 
+  @Column({ nullable: true })
+  last_login_at?: Date;
+
   @CreateDateColumn()
   created_at: Date;
 
   @UpdateDateColumn()
   updated_at: Date;
 
-  @ManyToOne(() => Supplier, (supplier) => supplier.employees)
-  supplier: Supplier;
-}
+  @OneToOne(() => Employee)
+  @JoinColumn()
+  employee: Employee;
+} 

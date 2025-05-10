@@ -9,7 +9,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../application/guards/jwt-auth.guard';
+import { AuthGuard } from 'src/application/guards/auth.guard';
 import { EmailVerificationService } from '../../application/services/email-verification.service';
 
 @ApiTags('email-verification')
@@ -20,7 +20,7 @@ export class EmailVerificationController {
   ) {}
 
   @Post('send')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Enviar email de verificación',
@@ -46,7 +46,6 @@ export class EmailVerificationController {
     name: 'token',
     description: 'Token de verificación enviado por email',
   })
-
   @ApiResponse({
     status: 200,
     description: 'Email verificado exitosamente',
@@ -56,7 +55,7 @@ export class EmailVerificationController {
   }
 
   @Post('resend')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Reenviar email de verificación',
@@ -71,4 +70,3 @@ export class EmailVerificationController {
     return this.emailVerificationService.resendVerificationEmail(employeeId);
   }
 }
-

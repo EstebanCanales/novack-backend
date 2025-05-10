@@ -47,4 +47,28 @@ export class UpdateEmployeeDto {
     @IsUUID()
     @IsOptional()
     supplier_id?: string;
+
+    @ApiPropertyOptional({ 
+        description: 'Número de teléfono del empleado',
+        example: '+34 600 123 456',
+    })
+    @IsString()
+    @IsOptional()
+    phone?: string;
+
+    @ApiPropertyOptional({ 
+        description: 'Cargo o posición del empleado en la empresa',
+        example: 'Gerente de Ventas',
+    })
+    @IsString()
+    @IsOptional()
+    position?: string;
+
+    @ApiPropertyOptional({ 
+        description: 'Departamento al que pertenece el empleado',
+        example: 'Ventas',
+    })
+    @IsString()
+    @IsOptional()
+    department?: string;
 }

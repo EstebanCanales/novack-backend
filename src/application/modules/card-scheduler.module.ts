@@ -1,15 +1,15 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
-import { CardService } from '../services/card.service';
-import { CardController } from '../../interface/controllers/card.controller';
-import { Card, CardLocation, Supplier, Visitor } from 'src/domain/entities';
+import { ScheduleModule } from '@nestjs/schedule';
+import { Card, CardLocation, Visitor, Appointment } from 'src/domain/entities';
+import { CardSchedulerService } from '../services/card-scheduler.service';
+import { CardModule } from './card.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { CardSchedulerModule } from './card-scheduler.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Card, CardLocation, Supplier, Visitor]),
+    TypeOrmModule.forFeature([Card, CardLocation, Visitor, Appointment]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -18,10 +18,10 @@ import { CardSchedulerModule } from './card-scheduler.module';
         signOptions: { expiresIn: '1d' },
       }),
     }),
-    forwardRef(() => CardSchedulerModule),
+    ScheduleModule.forRoot(),
+    forwardRef(() => CardModule),
   ],
-  controllers: [CardController],
-  providers: [CardService],
-  exports: [CardService],
+  providers: [CardSchedulerService],
+  exports: [CardSchedulerService],
 })
-export class CardModule {}
+export class CardSchedulerModule {} 

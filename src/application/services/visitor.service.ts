@@ -3,7 +3,7 @@ import { CreateVisitorDto } from '../dtos/visitor';
 import { UpdateVisitorDto } from '../dtos/visitor';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Visitor, Supplier } from 'src/domain/entities';
+import { Visitor, Appointment, Supplier } from 'src/domain/entities';
 import { CardService } from './card.service';
 import { EmailService } from './email.service';
 
@@ -12,6 +12,8 @@ export class VisitorService {
   constructor(
     @InjectRepository(Visitor)
     private readonly visitorRepository: Repository<Visitor>,
+    @InjectRepository(Appointment)
+    private readonly appointmentRepository: Repository<Appointment>,
     @InjectRepository(Supplier)
     private readonly supplierRepository: Repository<Supplier>,
     private readonly cardService: CardService,
@@ -42,20 +44,39 @@ export class VisitorService {
       createVisitorDto.check_out_time,
     );
 
+    // Crear visitante
     const visitor = this.visitorRepository.create({
-      ...createVisitorDto,
-      supplier,
+      name: createVisitorDto.name,
+      email: createVisitorDto.email,
+      phone: createVisitorDto.phone,
+      location: createVisitorDto.location,
       state: 'pendiente',
+      supplier,
     });
 
     const savedVisitor = await this.visitorRepository.save(visitor);
+
+    // Crear cita
+    const appointment = this.appointmentRepository.create({
+      title: createVisitorDto.appointment,
+      description: createVisitorDto.appointment_description,
+      scheduled_time: new Date(),
+      check_in_time: createVisitorDto.check_in_time,
+      check_out_time: createVisitorDto.check_out_time,
+      complaints: createVisitorDto.complaints || { invitado1: 'ninguno' },
+      status: 'pendiente',
+      visitor: savedVisitor,
+      supplier,
+    });
+
+    await this.appointmentRepository.save(appointment);
 
     // Enviar email de bienvenida
     try {
       await this.emailService.sendVisitorWelcomeEmail(
         savedVisitor.email,
         savedVisitor.name,
-        savedVisitor.check_in_time,
+        appointment.check_in_time,
         savedVisitor.location,
       );
     } catch (error) {
@@ -72,19 +93,19 @@ export class VisitorService {
       console.error('Error al asignar tarjeta:', error);
     }
 
-    return savedVisitor;
+    return this.findOne(savedVisitor.id);
   }
 
   async findAll() {
     return await this.visitorRepository.find({
-      relations: ['supplier', 'card'],
+      relations: ['supplier', 'card', 'appointments'],
     });
   }
 
   async findOne(id: string) {
     const visitor = await this.visitorRepository.findOne({
       where: { id },
-      relations: ['supplier', 'card'],
+      relations: ['supplier', 'card', 'appointments'],
     });
 
     if (!visitor) {
@@ -97,6 +118,12 @@ export class VisitorService {
   async update(id: string, updateVisitorDto: UpdateVisitorDto) {
     const visitor = await this.findOne(id);
 
+    if (!visitor.appointments || visitor.appointments.length === 0) {
+      throw new BadRequestException('El visitante no tiene citas asociadas');
+    }
+
+    const appointment = visitor.appointments[0]; // Usar la primera cita
+
     if (updateVisitorDto.supplier_id) {
       const supplier = await this.supplierRepository.findOne({
         where: { id: updateVisitorDto.supplier_id },
@@ -107,17 +134,36 @@ export class VisitorService {
       }
 
       visitor.supplier = supplier;
+      appointment.supplier = supplier;
     }
 
     if (updateVisitorDto.check_in_time || updateVisitorDto.check_out_time) {
       this.validateDates(
-        updateVisitorDto.check_in_time || visitor.check_in_time,
-        updateVisitorDto.check_out_time || visitor.check_out_time,
+        updateVisitorDto.check_in_time || appointment.check_in_time,
+        updateVisitorDto.check_out_time || appointment.check_out_time,
       );
     }
 
-    Object.assign(visitor, updateVisitorDto);
-    return await this.visitorRepository.save(visitor);
+    // Actualizar visitante
+    if (updateVisitorDto.name) visitor.name = updateVisitorDto.name;
+    if (updateVisitorDto.email) visitor.email = updateVisitorDto.email;
+    if (updateVisitorDto.phone) visitor.phone = updateVisitorDto.phone;
+    if (updateVisitorDto.location) visitor.location = updateVisitorDto.location;
+    if (updateVisitorDto.state) visitor.state = updateVisitorDto.state;
+
+    await this.visitorRepository.save(visitor);
+
+    // Actualizar cita
+    if (updateVisitorDto.appointment) appointment.title = updateVisitorDto.appointment;
+    if (updateVisitorDto.appointment_description) appointment.description = updateVisitorDto.appointment_description;
+    if (updateVisitorDto.complaints) appointment.complaints = updateVisitorDto.complaints;
+    if (updateVisitorDto.check_in_time) appointment.check_in_time = updateVisitorDto.check_in_time;
+    if (updateVisitorDto.check_out_time) appointment.check_out_time = updateVisitorDto.check_out_time;
+    if (updateVisitorDto.state) appointment.status = updateVisitorDto.state;
+
+    await this.appointmentRepository.save(appointment);
+
+    return this.findOne(id);
   }
 
   async remove(id: string) {
@@ -132,27 +178,35 @@ export class VisitorService {
       throw new BadRequestException('El visitante ya ha realizado el check-out');
     }
 
-    if (!visitor.check_in_time) {
+    if (!visitor.appointments || visitor.appointments.length === 0) {
+      throw new BadRequestException('El visitante no tiene citas asociadas');
+    }
+
+    const appointment = visitor.appointments[0];
+    if (!appointment.check_in_time) {
       throw new BadRequestException('El visitante no ha realizado el check-in');
     }
 
-    visitor.check_out_time = new Date();
+    appointment.check_out_time = new Date();
+    appointment.status = 'completado';
     visitor.state = 'completado';
+
+    // Guardar los cambios
+    await this.appointmentRepository.save(appointment);
+    const updatedVisitor = await this.visitorRepository.save(visitor);
 
     // Liberar la tarjeta si tiene una asignada
     if (visitor.card) {
       await this.cardService.unassignFromVisitor(visitor.card.id);
     }
 
-    const updatedVisitor = await this.visitorRepository.save(visitor);
-
     // Enviar email de checkout
     try {
       await this.emailService.sendVisitorCheckoutEmail(
         visitor.email,
         visitor.name,
-        visitor.check_in_time,
-        visitor.check_out_time,
+        appointment.check_in_time,
+        appointment.check_out_time,
         visitor.location,
       );
     } catch (error) {
@@ -173,11 +227,23 @@ export class VisitorService {
 
     return await this.visitorRepository.find({
       where: { supplier: { id: supplier_id } },
-      relations: ['supplier', 'card'],
+      relations: ['supplier', 'card', 'appointments'],
       order: {
-        check_in_time: 'DESC',
+        created_at: 'DESC',
       },
     });
+  }
+
+  // --- NUEVO MÉTODO PARA ACTUALIZAR URL DE IMAGEN DE PERFIL ---
+  async updateProfileImageUrl(id: string, imageUrl: string) {
+    const visitor = await this.visitorRepository.findOneBy({ id });
+    if (!visitor) {
+      throw new BadRequestException('El visitante no existe');
+    }
+
+    visitor.profile_image_url = imageUrl;
+    await this.visitorRepository.save(visitor);
+    return visitor; // Opcional: devolver el visitante actualizado
   }
 }
 

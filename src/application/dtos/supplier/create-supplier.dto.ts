@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsBoolean, IsOptional, IsNumber, Min, Matches } from 'class-validator';
+import { IsString, IsEmail, IsBoolean, IsOptional, IsNumber, Min, Matches, IsObject } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateSupplierDto {
@@ -64,13 +64,15 @@ export class CreateSupplierDto {
 	logo_url: string;
 
 	@ApiPropertyOptional({ 
-		description: 'Información adicional del proveedor',
-		example: 'Horario de atención: L-V 9am-6pm',
-		default: ''
+		description: 'Información adicional del proveedor (objeto JSON)',
+		example: { "clave": "valor", "otra_clave": 123 },
+		type: 'object',
+		additionalProperties: true,
+		default: {}
 	})
-	@IsString()
+	@IsObject()
 	@IsOptional()
-	additional_info?: string;
+	additional_info?: Record<string, any>;
 
 	@ApiProperty({ 
 		description: 'Indica si el proveedor tiene una suscripción activa',
