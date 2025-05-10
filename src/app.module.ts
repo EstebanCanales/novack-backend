@@ -23,8 +23,8 @@ import { RedisDatabaseModule } from './infrastructure/database/redis/redis.datab
 import { CardSchedulerModule } from './application/modules/card-scheduler.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ESP32Module } from './application/modules/esp32.module';
-// import { CompanyModule } from './application/modules/company.module';
-// import { ServiceModule } from './application/modules/service.module';
+import { DatabaseResetModule } from './application/modules/database-reset.module';
+import { ChatModule } from './application/modules/chat.module';
 
 /**
  * Root module of the application that configures and organizes all feature modules.
@@ -84,6 +84,10 @@ import { ESP32Module } from './application/modules/esp32.module';
     // Communication modules
     EmailModule, // Email service integration
     EmailVerificationModule, // Email verification workflows
+    ChatModule, // Chat service with WebSockets
+    
+    // Maintenance modules
+    DatabaseResetModule, // Database reset functionality (development only)
 
     // Additional modules
     /*
