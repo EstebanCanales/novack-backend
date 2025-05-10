@@ -7,6 +7,7 @@ import {
   UpdateDateColumn,
   OneToOne,
   JoinColumn,
+  OneToMany,
 } from 'typeorm';
 import { Supplier } from './supplier.entity';
 import { Visitor } from './visitor.entity';
@@ -16,11 +17,17 @@ export class Card {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ unique: true })
+  card_number: string;
+
   @Column({ default: true })
   is_active: boolean;
 
   @Column({ nullable: true })
   issued_at: Date;
+
+  @Column({ nullable: true })
+  expires_at: Date;
 
   @Column({ type: 'numeric', precision: 9, scale: 6, nullable: true })
   latitude: number;
@@ -31,16 +38,46 @@ export class Card {
   @Column({ type: 'numeric', precision: 5, scale: 2, nullable: true })
   accuracy: number;
 
+  @Column({ type: 'jsonb', nullable: true })
+  additional_info: Record<string, any>;
+
   @CreateDateColumn()
   created_at: Date;
 
   @UpdateDateColumn()
   updated_at: Date;
 
-  @ManyToOne(() => Supplier, (supplier) => supplier.id)
+  @ManyToOne(() => Supplier, (supplier) => supplier.cards)
   supplier: Supplier;
 
   @OneToOne(() => Visitor, (visitor) => visitor.card)
   @JoinColumn()
   visitor: Visitor;
+
+  @OneToMany(() => CardLocation, (location) => location.card)
+  locations: CardLocation[];
+}
+
+@Entity({ name: 'card_locations' })
+export class CardLocation {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ type: 'numeric', precision: 9, scale: 6 })
+  latitude: number;
+
+  @Column({ type: 'numeric', precision: 9, scale: 6 })
+  longitude: number;
+
+  @Column({ type: 'numeric', precision: 5, scale: 2, nullable: true })
+  accuracy: number;
+
+  @Column({ type: 'timestamp' })
+  timestamp: Date;
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @ManyToOne(() => Card, (card) => card.locations)
+  card: Card;
 }

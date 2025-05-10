@@ -4,17 +4,21 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "4000:4000"
+      - '4000:4000'
     environment:
       - NODE_ENV=development
       - DB_TYPE=postgres
       - DB_HOST=postgres
-      - DB_PORT=5432
+      - DB_PORT=5430
       - DB_USERNAME=postgres
       - DB_PASSWORD=postgres
       - DB_NAME=spcedes
+      - JWT_SECRET=1234
+      - JWT_EXPIRATION=24h
+      - RESEND_API_KEY=${RESEND_API_KEY}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - ESP32_AUTH_KEY=esp32_secret_key_12345
     depends_on:
       - postgres
       - redis
@@ -23,30 +27,38 @@ services:
 
   postgres:
     image: postgres:16-alpine
+    command: -p 5430
     ports:
-      - "5432:5432"
+      - '5430:5430'
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=spcedes
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -p 5430']
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - app-network
 
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
+      - '6379:6379'
+    command: redis-server
     networks:
       - app-network
-    command: redis-server --appendonly yes
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
-  redis_data:
 
 networks:
   app-network:

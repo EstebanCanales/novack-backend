@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { EmployeeService } from './employee.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Employee } from '../../domain/entities';
+import { Employee, EmployeeAuth } from '../../domain/entities';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -16,49 +16,54 @@ export class AuthService {
     private readonly jwtService: JwtService,
     @InjectRepository(Employee)
     private readonly employeeRepository: Repository<Employee>,
+    @InjectRepository(EmployeeAuth)
+    private readonly employeeAuthRepository: Repository<EmployeeAuth>,
   ) {}
 
   async validateEmployee(email: string, password: string) {
-    const employee = await this.employeeService.findByEmail(email);
-    if (!employee) {
+    const employeeData = await this.employeeService.findByEmail(email);
+    if (!employeeData || !employeeData.auth) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
+    const { auth, ...employee } = employeeData;
+
     // Verificar si la cuenta está bloqueada
-    if (employee.locked_until && employee.locked_until > new Date()) {
+    if (auth.locked_until && auth.locked_until > new Date()) {
       const remainingMinutes = Math.ceil(
-        (employee.locked_until.getTime() - new Date().getTime()) / (1000 * 60)
+        (auth.locked_until.getTime() - new Date().getTime()) / (1000 * 60)
       );
       throw new UnauthorizedException(
         `Cuenta bloqueada. Intente nuevamente en ${remainingMinutes} minutos`
       );
     }
 
-    const isPasswordValid = await bcrypt.compare(password, employee.password);
+    const isPasswordValid = await bcrypt.compare(password, auth.password);
     if (!isPasswordValid) {
       // Incrementar el contador de intentos fallidos
-      employee.login_attempts += 1;
+      auth.login_attempts += 1;
 
       // Si excede el máximo de intentos, bloquear la cuenta
-      if (employee.login_attempts >= this.MAX_LOGIN_ATTEMPTS) {
-        employee.locked_until = new Date(
+      if (auth.login_attempts >= this.MAX_LOGIN_ATTEMPTS) {
+        auth.locked_until = new Date(
           Date.now() + this.LOCK_TIME_MINUTES * 60 * 1000
         );
-        await this.employeeRepository.save(employee);
+        await this.employeeAuthRepository.save(auth);
         throw new UnauthorizedException(
           `Demasiados intentos fallidos. Cuenta bloqueada por ${this.LOCK_TIME_MINUTES} minutos`
         );
       }
 
-      await this.employeeRepository.save(employee);
+      await this.employeeAuthRepository.save(auth);
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
     // Restablecer los intentos fallidos si el login es exitoso
-    if (employee.login_attempts > 0) {
-      employee.login_attempts = 0;
-      employee.locked_until = null;
-      await this.employeeRepository.save(employee);
+    if (auth.login_attempts > 0) {
+      auth.login_attempts = 0;
+      auth.locked_until = null;
+      auth.last_login_at = new Date();
+      await this.employeeAuthRepository.save(auth);
     }
 
     return employee;

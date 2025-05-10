@@ -7,6 +7,10 @@ import {
   OneToMany,
 } from 'typeorm';
 import { Employee } from './employee.entity';
+import { Visitor } from './visitor.entity';
+import { Card } from './card.entity';
+import { Sensor } from './sensor.entity';
+import { SupplierSubscription } from './supplier-subscription.entity';
 
 @Entity({ name: 'suppliers' })
 export class Supplier {
@@ -19,7 +23,7 @@ export class Supplier {
   @Column({ nullable: true })
   supplier_creator: string;
 
-  @Column()
+  @Column({ unique: true })
   contact_email: string;
 
   @Column()
@@ -31,26 +35,14 @@ export class Supplier {
   @Column()
   description: string;
 
-  @Column()
+  @Column({ nullable: true })
   logo_url: string;
 
-  @Column()
-  additional_info: string;
+  @Column({ type: 'jsonb', nullable: true })
+  additional_info: Record<string, any>;
 
-  @Column({ default: false })
-  is_subscribed: boolean;
-
-  @Column({ default: false })
-  has_card_subscription: boolean;
-
-  @Column({ default: false })
-  has_sensor_subscription: boolean;
-
-  @Column()
-  employee_count: number;
-
-  @Column()
-  card_count: number;
+  @Column({ nullable: true })
+  profile_image_url?: string;
 
   @CreateDateColumn()
   created_at: Date;
@@ -58,6 +50,19 @@ export class Supplier {
   @UpdateDateColumn()
   updated_at: Date;
 
+  // Relaciones
   @OneToMany(() => Employee, (employee) => employee.supplier)
   employees: Employee[];
+
+  @OneToMany(() => Visitor, (visitor) => visitor.supplier)
+  visitors: Visitor[];
+
+  @OneToMany(() => Card, (card) => card.supplier)
+  cards: Card[];
+
+  @OneToMany(() => Sensor, (sensor) => sensor.supplier)
+  sensors: Sensor[];
+
+  // Relación con SupplierSubscription - sin decorador para evitar referencias circulares
+  subscription?: SupplierSubscription;
 }

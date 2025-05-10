@@ -9,18 +9,34 @@ import {
   ParseUUIDPipe,
   HttpStatus,
   HttpCode,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  FileTypeValidator,
+  MaxFileSizeValidator,
+  Req,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ConfigService } from '@nestjs/config';
 import { EmployeeService } from '../../application/services/employee.service';
 import {
   CreateEmployeeDto,
   UpdateEmployeeDto,
 } from '../../application/dtos/employee';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiConsumes } from '@nestjs/swagger';
+import { FileStorageService } from '../../application/services/file-storage.service';
+import { ImageProcessingPipe } from '../../application/pipes/image-processing.pipe';
+import { Express } from 'express';
 
 @ApiTags('employees')
 @Controller('employees')
 export class EmployeeController {
-  constructor(private readonly employeeService: EmployeeService) {}
+  constructor(
+    private readonly employeeService: EmployeeService,
+    private readonly fileStorageService: FileStorageService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -201,6 +217,52 @@ export class EmployeeController {
   @ApiResponse({ status: 404, description: 'Empleado no encontrado en el sistema.' })
   remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.employeeService.remove(id);
+  }
+
+  @Patch(':id/profile-image')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('profileImage'))
+  @ApiOperation({ summary: 'Subir o actualizar imagen de perfil del empleado' })
+  @ApiParam({ name: 'id', description: 'ID UUID del empleado', type: String })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Archivo de imagen de perfil (JPG, PNG, WEBP)',
+    schema: {
+      type: 'object',
+      properties: {
+        profileImage: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Imagen de perfil actualizada.' })
+  @ApiResponse({ status: 400, description: 'Archivo inválido, tipo no permitido o error de procesamiento.' })
+  @ApiResponse({ status: 404, description: 'Empleado no encontrado.' })
+  async uploadProfileImage(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @UploadedFile(ImageProcessingPipe)
+    file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No se proporcionó ningún archivo.');
+    }
+
+    const bucketName = this.configService.get<string>('AWS_S3_EMPLOYEE_BUCKET_NAME');
+    if (!bucketName) {
+      throw new Error('Nombre del bucket S3 para empleados no configurado (AWS_S3_EMPLOYEE_BUCKET_NAME).');
+    }
+
+    const destinationPath = `profile/`;
+    const imageUrl = await this.fileStorageService.uploadFile(
+      bucketName,
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+      destinationPath,
+    );
+
+    await this.employeeService.updateProfileImageUrl(id, imageUrl);
+
+    return { message: 'Imagen de perfil actualizada correctamente.', url: imageUrl };
   }
 }
 

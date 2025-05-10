@@ -7,18 +7,26 @@ import {
   Param,
   Delete,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { CardService } from '../../application/services/card.service';
-import { CreateCardDto } from '../../application/dtos/card/create-card.dto';
-import { UpdateCardDto } from '../../application/dtos/card/update-card.dto';
+import {
+  CreateCardDto,
+  UpdateCardDto,
+  CardLocationDto,
+} from '../../application/dtos/card';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { JwtAuthGuard } from 'src/application/guards/jwt-auth.guard';
+import { AuthGuard } from '../../application/guards/auth.guard';
+import { CardSchedulerService } from '../../application/services/card-scheduler.service';
 
 @ApiTags('cards')
 @Controller('cards')
-@UseGuards(JwtAuthGuard)
+@UseGuards(AuthGuard)
 export class CardController {
-  constructor(private readonly cardService: CardService) {}
+  constructor(
+    private readonly cardService: CardService,
+    private readonly cardSchedulerService: CardSchedulerService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Crear una nueva tarjeta' })
@@ -58,6 +66,12 @@ export class CardController {
   })
   findOne(@Param('id') id: string) {
     return this.cardService.findOne(id);
+  }
+
+  @Get(':id/locations')
+  @UseGuards(AuthGuard)
+  findLocations(@Param('id') id: string) {
+    return this.cardService.findLocationHistory(id);
   }
 
   @Put(':id')
@@ -101,5 +115,19 @@ export class CardController {
   })
   unassignFromVisitor(@Param('id') id: string) {
     return this.cardService.unassignFromVisitor(id);
+  }
+
+  @Post(':id/location')
+  @UseGuards(AuthGuard)
+  recordLocation(
+    @Param('id') id: string,
+    @Body() locationDto: CardLocationDto,
+  ) {
+    return this.cardService.recordLocation(
+      id,
+      locationDto.latitude,
+      locationDto.longitude,
+      locationDto.accuracy,
+    );
   }
 }

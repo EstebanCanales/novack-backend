@@ -27,10 +27,6 @@ async function bootstrap() {
         'visitors',
         'Operaciones relacionadas con visitantes y su gestión',
       )
-      .addTag(
-        'Employee',
-        'Operaciones relacionadas con empleados de proveedores',
-      )
       .addTag('Sensor', 'Comming soon...')
       .build();
 

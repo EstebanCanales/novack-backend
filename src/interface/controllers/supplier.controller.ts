@@ -9,7 +9,12 @@ import {
   ParseUUIDPipe,
   HttpStatus,
   HttpCode,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ConfigService } from '@nestjs/config';
 import { SupplierService } from '../../application/services/supplier.service';
 import {
   CreateSupplierDto,
@@ -21,12 +26,20 @@ import {
   ApiResponse,
   ApiParam,
   ApiBody,
+  ApiConsumes,
 } from '@nestjs/swagger';
+import { FileStorageService } from '../../application/services/file-storage.service';
+import { ImageProcessingPipe } from '../../application/pipes/image-processing.pipe';
+import { Express } from 'express';
 
 @ApiTags('suppliers')
 @Controller('suppliers')
 export class SupplierController {
-  constructor(private readonly supplierService: SupplierService) {}
+  constructor(
+    private readonly supplierService: SupplierService,
+    private readonly fileStorageService: FileStorageService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -114,5 +127,51 @@ export class SupplierController {
   })
   remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.supplierService.remove(id);
+  }
+
+  @Patch(':id/profile-image')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('profileImage'))
+  @ApiOperation({ summary: 'Subir o actualizar imagen de perfil del proveedor' })
+  @ApiParam({ name: 'id', description: 'ID UUID del proveedor', type: String })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Archivo de imagen de perfil (JPG, PNG, WEBP)',
+    schema: {
+      type: 'object',
+      properties: {
+        profileImage: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Imagen de perfil actualizada.' })
+  @ApiResponse({ status: 400, description: 'Archivo inválido, tipo no permitido o error de procesamiento.' })
+  @ApiResponse({ status: 404, description: 'Proveedor no encontrado.' })
+  async uploadProfileImage(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @UploadedFile(ImageProcessingPipe)
+    file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No se proporcionó ningún archivo.');
+    }
+
+    const bucketName = this.configService.get<string>('AWS_S3_SUPPLIER_BUCKET_NAME');
+    if (!bucketName) {
+      throw new Error('Nombre del bucket S3 para proveedores no configurado (AWS_S3_SUPPLIER_BUCKET_NAME).');
+    }
+
+    const destinationPath = `profile/`;
+    const imageUrl = await this.fileStorageService.uploadFile(
+      bucketName,
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+      destinationPath,
+    );
+
+    await this.supplierService.updateProfileImageUrl(id, imageUrl);
+
+    return { message: 'Imagen de perfil actualizada correctamente.', url: imageUrl };
   }
 }

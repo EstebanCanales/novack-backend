@@ -1,21 +1,12 @@
 import { Controller, Get } from '@nestjs/common';
-import {
-  HealthCheckService,
-  HealthCheck,
-  HealthCheckResult,
-} from '@nestjs/terminus';
-import { RedisHealthIndicator } from '@nestjs-modules/ioredis';
+import { RedisDatabaseService } from './redis.database.service';
 
 @Controller('redis')
 export class RedisDatabaseController {
-  constructor(
-    private health: HealthCheckService,
-    private redis: RedisHealthIndicator,
-  ) {}
+  constructor(private readonly databaseService: RedisDatabaseService) {}
 
-  @Get('health')
-  @HealthCheck()
-  check(): Promise<HealthCheckResult> {
-    return this.health.check([async () => this.redis.isHealthy('redis')]);
+  @Get('healt')
+  testConnection() {
+    return this.databaseService.testConnection();
   }
 }

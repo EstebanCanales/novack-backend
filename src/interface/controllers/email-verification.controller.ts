@@ -9,20 +9,23 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../application/guards/jwt-auth.guard';
+import { AuthGuard } from 'src/application/guards/auth.guard';
 import { EmailVerificationService } from '../../application/services/email-verification.service';
 
 @ApiTags('email-verification')
 @Controller('email-verification')
 export class EmailVerificationController {
-  constructor(private readonly emailVerificationService: EmailVerificationService) {}
+  constructor(
+    private readonly emailVerificationService: EmailVerificationService,
+  ) {}
 
   @Post('send')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Enviar email de verificación',
-    description: 'Envía un email con el enlace de verificación al empleado actual',
+    description:
+      'Envía un email con el enlace de verificación al empleado actual',
   })
   @ApiResponse({
     status: 200,
@@ -52,7 +55,7 @@ export class EmailVerificationController {
   }
 
   @Post('resend')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Reenviar email de verificación',
@@ -66,4 +69,4 @@ export class EmailVerificationController {
     const employeeId = req.user.id;
     return this.emailVerificationService.resendVerificationEmail(employeeId);
   }
-} 
+}

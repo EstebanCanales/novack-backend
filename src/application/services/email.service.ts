@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
 import { ConfigService } from '@nestjs/config';
 import { Supplier } from '../../domain/entities/supplier.entity';
@@ -7,126 +7,110 @@ import { Supplier } from '../../domain/entities/supplier.entity';
 export class EmailService {
   private readonly resend: Resend;
   private readonly adminEmail: string = 'jack.bright.director@gmail.com';
+  private readonly logger = new Logger(EmailService.name);
 
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('RESEND_API_KEY');
-    console.log('Resend API Key:', apiKey);
     this.resend = new Resend(apiKey);
   }
 
   async sendSupplierCreationEmail(
     supplier: Supplier,
-    creatorEmail: string,
-    creatorPassword: string,
+    email: string,
+    temporalPassword: string,
   ) {
-    console.log('Iniciando envío de email al proveedor:', {
-      supplier_name: supplier.supplier_name,
-      creator_email: creatorEmail,
-    });
-
     try {
-      // Email para el creador del proveedor
-      const creatorEmailResult = await this.resend.emails.send({
-        from: 'SP-CEDES <onboarding@resend.dev>',
-        to: [creatorEmail],
-        subject: 'Bienvenido a SP-CEDES - Información de tu cuenta',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #333;">¡Bienvenido a SP-CEDES!</h1>
-            
-            <p>Hola ${supplier.supplier_creator},</p>
-            
-            <p>Tu cuenta de proveedor ha sido creada exitosamente. A continuación, encontrarás los detalles de acceso:</p>
-            
-            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #333; margin-top: 0;">Credenciales de acceso:</h3>
-              <p><strong>Email:</strong> ${creatorEmail}</p>
-              <p><strong>Contraseña temporal:</strong> ${creatorPassword}</p>
-            </div>
-            
-            <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <p style="color: #856404; margin: 0;">
-                <strong>⚠️ Importante:</strong> Por seguridad, te recomendamos cambiar tu contraseña en tu primer inicio de sesión.
-              </p>
-            </div>
-            
-            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #333; margin-top: 0;">Información del proveedor:</h3>
-              <p><strong>Nombre:</strong> ${supplier.supplier_name}</p>
-              <p><strong>Email de contacto:</strong> ${supplier.contact_email}</p>
-              <p><strong>Teléfono:</strong> ${supplier.phone_number}</p>
-              <p><strong>Dirección:</strong> ${supplier.address}</p>
-              <p><strong>Descripción:</strong> ${supplier.description}</p>
-            </div>
-            
-            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #333; margin-top: 0;">Suscripciones activas:</h3>
-              <ul style="padding-left: 20px;">
-                <li>Suscripción general: ${supplier.is_subscribed ? 'Activa' : 'Inactiva'}</li>
-                <li>Tarjetas: ${supplier.has_card_subscription ? 'Activa' : 'Inactiva'}</li>
-                <li>Sensores: ${supplier.has_sensor_subscription ? 'Activa' : 'Inactiva'}</li>
-              </ul>
-              <p><strong>Tarjetas asignadas:</strong> ${supplier.card_count}</p>
-              <p><strong>Empleados permitidos:</strong> ${supplier.employee_count}</p>
-            </div>
-            
-            <p style="color: #666;">
-              Si tienes alguna pregunta o necesitas ayuda, no dudes en contactarnos.
-            </p>
-            
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #888; font-size: 0.8em;">
-              © ${new Date().getFullYear()} SP-CEDES. Todos los derechos reservados.
-            </div>
-          </div>
-        `,
+      // Verificar que el proveedor tenga una suscripción
+      if (!supplier.subscription) {
+        throw new BadRequestException('El proveedor no tiene información de suscripción');
+      }
+
+      const emailContent = `
+        <h1>Bienvenido a SP Cedes</h1>
+        <p>Estimado/a ${supplier.supplier_name},</p>
+        
+        <p>Su cuenta ha sido creada exitosamente. A continuación, se detallan sus credenciales de acceso:</p>
+        
+        <ul>
+          <li>Email: ${email}</li>
+          <li>Contraseña temporal: ${temporalPassword}</li>
+        </ul>
+        
+        <p>Por favor, inicie sesión y cambie su contraseña lo antes posible.</p>
+        
+        <h2>Detalles de su suscripción:</h2>
+        <ul>
+          <li>Suscripción general: ${supplier.subscription.is_subscribed ? 'Activa' : 'Inactiva'}</li>
+          <li>Tarjetas: ${supplier.subscription.has_card_subscription ? 'Activa' : 'Inactiva'}</li>
+          <li>Sensores: ${supplier.subscription.has_sensor_subscription ? 'Activa' : 'Inactiva'}</li>
+        </ul>
+        <p><strong>Tarjetas asignadas:</strong> ${supplier.subscription.max_card_count}</p>
+        <p><strong>Empleados permitidos:</strong> ${supplier.subscription.max_employee_count}</p>
+        
+        <p>Si tiene alguna pregunta o necesita asistencia, no dude en contactar a nuestro equipo de soporte.</p>
+        
+        <p>Atentamente,<br>
+        El equipo de SP Cedes</p>
+      `;
+
+      const result = await this.resend.emails.send({
+        from: 'onboarding@resend.dev',
+        to: [email],
+        subject: 'Bienvenido a SP Cedes - Credenciales de acceso',
+        html: emailContent,
       });
 
-      console.log('Email enviado al creador exitosamente:', creatorEmailResult);
-
-      // Email para el administrador
-      const adminEmailResult = await this.resend.emails.send({
-        from: 'SP-CEDES <onboarding@resend.dev>',
-        to: [this.adminEmail],
-        subject: `Nuevo proveedor registrado: ${supplier.supplier_name}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #333;">Nuevo proveedor registrado</h1>
-            
-            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #333; margin-top: 0;">Información del proveedor:</h3>
-              <p><strong>Nombre:</strong> ${supplier.supplier_name}</p>
-              <p><strong>Creador:</strong> ${supplier.supplier_creator}</p>
-              <p><strong>Email del creador:</strong> ${creatorEmail}</p>
-              <p><strong>Email de contacto:</strong> ${supplier.contact_email}</p>
-              <p><strong>Teléfono:</strong> ${supplier.phone_number}</p>
-              <p><strong>Dirección:</strong> ${supplier.address}</p>
-              <p><strong>Descripción:</strong> ${supplier.description}</p>
-            </div>
-            
-            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-              <h3 style="color: #333; margin-top: 0;">Detalles de suscripción:</h3>
-              <ul style="padding-left: 20px;">
-                <li>Suscripción general: ${supplier.is_subscribed ? 'Activa' : 'Inactiva'}</li>
-                <li>Tarjetas: ${supplier.has_card_subscription ? 'Activa' : 'Inactiva'}</li>
-                <li>Sensores: ${supplier.has_sensor_subscription ? 'Activa' : 'Inactiva'}</li>
-              </ul>
-              <p><strong>Tarjetas asignadas:</strong> ${supplier.card_count}</p>
-              <p><strong>Empleados permitidos:</strong> ${supplier.employee_count}</p>
-            </div>
-            
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #888; font-size: 0.8em;">
-              © ${new Date().getFullYear()} SP-CEDES. Todos los derechos reservados.
-            </div>
-          </div>
-        `,
-      });
-
-      console.log('Email enviado al administrador exitosamente:', adminEmailResult);
-
-      return { creatorEmailResult, adminEmailResult };
+      return result;
     } catch (error) {
-      console.error('Error al enviar los emails:', error);
-      throw error;
+      this.logger.error(`Error al enviar email de creación: ${error.message}`);
+      throw new BadRequestException(`Error al enviar email: ${error.message}`);
+    }
+  }
+
+  async sendSupplierUpdateEmail(
+    supplier: Supplier,
+    changes: string,
+  ) {
+    try {
+      // Verificar que el proveedor tenga una suscripción
+      if (!supplier.subscription) {
+        throw new BadRequestException('El proveedor no tiene información de suscripción');
+      }
+
+      const emailContent = `
+        <h1>Actualización de Cuenta SP Cedes</h1>
+        <p>Estimado/a ${supplier.supplier_name},</p>
+        
+        <p>Su cuenta ha sido actualizada. A continuación, se detallan los cambios realizados:</p>
+        
+        <p>${changes}</p>
+        
+        <h2>Estado actual de su suscripción:</h2>
+        <ul>
+          <li>Suscripción general: ${supplier.subscription.is_subscribed ? 'Activa' : 'Inactiva'}</li>
+          <li>Tarjetas: ${supplier.subscription.has_card_subscription ? 'Activa' : 'Inactiva'}</li>
+          <li>Sensores: ${supplier.subscription.has_sensor_subscription ? 'Activa' : 'Inactiva'}</li>
+        </ul>
+        <p><strong>Tarjetas asignadas:</strong> ${supplier.subscription.max_card_count}</p>
+        <p><strong>Empleados permitidos:</strong> ${supplier.subscription.max_employee_count}</p>
+        
+        <p>Si usted no solicitó estos cambios o tiene alguna pregunta, póngase en contacto con nuestro equipo de soporte inmediatamente.</p>
+        
+        <p>Atentamente,<br>
+        El equipo de SP Cedes</p>
+      `;
+
+      const result = await this.resend.emails.send({
+        from: 'onboarding@resend.dev',
+        to: [supplier.contact_email],
+        subject: 'SP Cedes - Actualización de su cuenta',
+        html: emailContent,
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Error al enviar email de actualización: ${error.message}`);
+      throw new BadRequestException(`Error al enviar email: ${error.message}`);
     }
   }
 
@@ -145,23 +129,30 @@ export class EmailService {
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #333;">¡Bienvenido a SP-CEDES, ${visitorName}!</h1>
           
-          <p>Tu visita ha sido programada para el ${appointmentDate.toLocaleDateString('es-PE', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}.</p>
+          <p>Tu visita ha sido programada para el ${appointmentDate.toLocaleDateString(
+            'es-PE',
+            {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            },
+          )}.</p>
           
           <p>Ubicación de tu visita: <strong>${location}</strong></p>
           
-          ${qrCodeUrl ? `
+          ${
+            qrCodeUrl
+              ? `
             <div style="text-align: center; margin: 20px 0;">
               <p>Tu código QR para acceso:</p>
               <img src="${qrCodeUrl}" alt="Código QR" style="max-width: 200px;"/>
             </div>
-          ` : ''}
+          `
+              : ''
+          }
           
           <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
             <h3 style="color: #333; margin-top: 0;">Recordatorios importantes:</h3>
@@ -207,22 +198,28 @@ export class EmailService {
           
           <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
             <h3 style="color: #333; margin-top: 0;">Detalles de tu visita:</h3>
-            <p><strong>Entrada:</strong> ${checkInTime.toLocaleDateString('es-PE', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}</p>
-            <p><strong>Salida:</strong> ${checkOutTime.toLocaleDateString('es-PE', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}</p>
+            <p><strong>Entrada:</strong> ${checkInTime.toLocaleDateString(
+              'es-PE',
+              {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              },
+            )}</p>
+            <p><strong>Salida:</strong> ${checkOutTime.toLocaleDateString(
+              'es-PE',
+              {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              },
+            )}</p>
             <p><strong>Ubicación:</strong> ${location}</p>
           </div>
           
@@ -303,7 +300,8 @@ export class EmailService {
       verificationToken,
     });
 
-    const baseUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    const baseUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
     console.log('Frontend URL:', baseUrl);
     const verificationUrl = `${baseUrl}/verify-email/${verificationToken}`;
     console.log('Verification URL:', verificationUrl);
@@ -357,7 +355,9 @@ export class EmailService {
 
       if (error) {
         console.error('Error al enviar email de verificación:', error);
-        throw new Error(`Error al enviar email de verificación: ${error.message}`);
+        throw new Error(
+          `Error al enviar email de verificación: ${error.message}`,
+        );
       }
 
       return data;
@@ -367,10 +367,7 @@ export class EmailService {
     }
   }
 
-  async sendEmailVerificationSuccess(
-    to: string,
-    employeeName: string,
-  ) {
+  async sendEmailVerificationSuccess(to: string, employeeName: string) {
     const { data, error } = await this.resend.emails.send({
       from: 'SP-CEDES <no-reply@spcedes.com>',
       to: [to],
@@ -401,9 +398,12 @@ export class EmailService {
     });
 
     if (error) {
-      throw new Error(`Error al enviar email de verificación exitosa: ${error.message}`);
+      throw new Error(
+        `Error al enviar email de verificación exitosa: ${error.message}`,
+      );
     }
 
     return data;
   }
-} 
+}
+
