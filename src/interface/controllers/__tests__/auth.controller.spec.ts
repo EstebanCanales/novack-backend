@@ -1,32 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { UnauthorizedException } from '@nestjs/common';
 import { AuthController } from '../auth.controller';
 import { AuthService } from '../../../application/services/auth.service';
+import { UnauthorizedException } from '@nestjs/common';
+import { LoginDto } from '../../../domain/dtos/auth/login.dto';
+import { RefreshTokenDto } from '../../../domain/dtos/auth/refresh-token.dto';
+import { LogoutDto } from '../../../domain/dtos/auth/logout.dto';
 
 describe('AuthController', () => {
   let controller: AuthController;
-  let authService: AuthService;
-
-  const mockAuthService = {
-    login: jest.fn(),
-    validateToken: jest.fn(),
-  };
-
-  const mockEmployee = {
-    id: '123e4567-e89b-12d3-a456-426614174000',
-    name: 'Juan Pérez',
-    email: 'juan@example.com',
-    is_creator: true,
-    supplier: null,
-  };
-
-  const mockLoginResponse = {
-    access_token: 'mock.jwt.token',
-    employee: mockEmployee,
-  };
+  let mockAuthService: Partial<AuthService>;
 
   beforeEach(async () => {
-    jest.clearAllMocks();
+    mockAuthService = {
+      login: jest.fn(),
+      refreshToken: jest.fn(),
+      logout: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
@@ -39,7 +28,6 @@ describe('AuthController', () => {
     }).compile();
 
     controller = module.get<AuthController>(AuthController);
-    authService = module.get<AuthService>(AuthService);
   });
 
   it('should be defined', () => {
@@ -47,49 +35,100 @@ describe('AuthController', () => {
   });
 
   describe('login', () => {
-    it('should return access token and employee data on successful login', async () => {
-      // Preparar
-      const loginDto = {
-        email: 'juan@example.com',
-        password: 'password123',
+    const loginDto: LoginDto = {
+      email: 'test@example.com',
+      password: 'password123',
+    };
+
+    const mockResponse = {
+      access_token: 'test-token',
+      refresh_token: 'test-refresh-token',
+      expires_in: 900,
+      token_type: 'Bearer',
+      employee: {
+        id: 'user-id',
+        name: 'Test User',
+        email: 'test@example.com',
+      },
+    };
+
+    it('should return token and employee data on successful login', async () => {
+      (mockAuthService.login as jest.Mock).mockResolvedValueOnce(mockResponse);
+
+      // Create a mock request object
+      const mockRequest = {
+        headers: {
+          'user-agent': 'test-user-agent',
+        },
+        ip: '127.0.0.1',
       };
-      mockAuthService.login.mockResolvedValue(mockLoginResponse);
 
-      // Ejecutar
-      const result = await controller.login(loginDto);
+      const result = await controller.login(loginDto, mockRequest);
 
-      // Verificar
-      expect(result).toEqual(mockLoginResponse);
-      expect(authService.login).toHaveBeenCalledWith(loginDto.email, loginDto.password);
+      expect(result).toEqual(mockResponse);
+      expect(mockAuthService.login).toHaveBeenCalledWith(loginDto.email, loginDto.password, mockRequest);
     });
 
-    it('should propagate UnauthorizedException from auth service', async () => {
-      // Preparar
-      const loginDto = {
-        email: 'juan@example.com',
-        password: 'wrongPassword',
-      };
+    it('should throw UnauthorizedException on login failure', async () => {
       const errorMessage = 'Credenciales inválidas';
-      mockAuthService.login.mockRejectedValue(new UnauthorizedException(errorMessage));
+      const error = new UnauthorizedException(errorMessage);
+      (mockAuthService.login as jest.Mock).mockRejectedValueOnce(error);
 
-      // Ejecutar y verificar
-      await expect(controller.login(loginDto)).rejects.toThrow(UnauthorizedException);
-      await expect(controller.login(loginDto)).rejects.toThrow(errorMessage);
-      expect(authService.login).toHaveBeenCalledWith(loginDto.email, loginDto.password);
-    });
-
-    it('should transform other errors into UnauthorizedException', async () => {
-      // Preparar
-      const loginDto = {
-        email: 'juan@example.com',
-        password: 'password123',
+      // Create a mock request object
+      const mockRequest = {
+        headers: {
+          'user-agent': 'test-user-agent',
+        },
+        ip: '127.0.0.1',
       };
-      mockAuthService.login.mockRejectedValue(new Error('Database error'));
 
-      // Ejecutar y verificar
-      await expect(controller.login(loginDto)).rejects.toThrow(UnauthorizedException);
-      await expect(controller.login(loginDto)).rejects.toThrow('Error al iniciar sesión');
-      expect(authService.login).toHaveBeenCalledWith(loginDto.email, loginDto.password);
+      // En este caso, necesitamos usar un único expect y guardar la promesa para que el test no la resuelva antes de tiempo
+      await expect(controller.login(loginDto, mockRequest)).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('refreshToken', () => {
+    const refreshTokenDto: RefreshTokenDto = {
+      refresh_token: 'valid-refresh-token',
+    };
+
+    const mockResponse = {
+      access_token: 'new-access-token',
+      refresh_token: 'new-refresh-token',
+      expires_in: 900,
+      token_type: 'Bearer',
+    };
+
+    it('should return new tokens on successful refresh', async () => {
+      (mockAuthService.refreshToken as jest.Mock).mockResolvedValueOnce(mockResponse);
+
+      // Create a mock request object
+      const mockRequest = {
+        headers: {
+          'user-agent': 'test-user-agent',
+        },
+        ip: '127.0.0.1',
+      };
+
+      const result = await controller.refreshToken(refreshTokenDto, mockRequest);
+
+      expect(result).toEqual(mockResponse);
+      expect(mockAuthService.refreshToken).toHaveBeenCalledWith(refreshTokenDto.refresh_token, mockRequest);
+    });
+  });
+
+  describe('logout', () => {
+    const logoutDto: LogoutDto = {
+      refresh_token: 'valid-refresh-token',
+    };
+
+    it('should successfully logout', async () => {
+      (mockAuthService.logout as jest.Mock).mockResolvedValueOnce(true);
+
+      const result = await controller.logout(logoutDto);
+
+      expect(result).toEqual({ success: true });
+      expect(mockAuthService.logout).toHaveBeenCalledWith(logoutDto.refresh_token);
     });
   });
 }); 

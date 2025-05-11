@@ -3,12 +3,33 @@ import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+import * as session from 'express-session';
+import * as cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   try {
     const app = await NestFactory.create(AppModule);
     const port = process.env.PORT || 4000;
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    // Configurar cookie parser para manejar cookies
+    app.use(cookieParser(process.env.COOKIE_SECRET || 'secret_cookie_for_dev_only'));
+
+    // Configurar sesiones
+    app.use(
+      session({
+        secret: process.env.SESSION_SECRET || 'session_secret_for_dev_only',
+        resave: false,
+        saveUninitialized: false,
+        cookie: {
+          httpOnly: true, // No accesible por JavaScript
+          secure: isProduction, // Solo https en producción
+          maxAge: 1000 * 60 * 60 * 24, // 24 horas
+          sameSite: isProduction ? 'strict' : 'lax',
+        },
+      }),
+    );
 
     // Aplicar helmet para seguridad de cabeceras HTTP
     app.use(helmet());
@@ -65,8 +86,8 @@ async function bootstrap() {
         'http://localhost:3000',
       ],
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-      exposedHeaders: ['Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-CSRF-TOKEN', 'X-XSRF-TOKEN'],
+      exposedHeaders: ['Authorization', 'XSRF-TOKEN'],
       credentials: true,
       maxAge: 3600,
     });

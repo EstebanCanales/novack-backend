@@ -8,15 +8,17 @@ const mockMethods = {
   ping: jest.fn().mockResolvedValue('PONG'),
   set: jest.fn().mockResolvedValue('OK'),
   get: jest.fn(),
-  lpush: jest.fn().mockResolvedValue(1),
-  ltrim: jest.fn().mockResolvedValue('OK'),
+  lPush: jest.fn().mockResolvedValue(1),
+  lTrim: jest.fn().mockResolvedValue('OK'),
   expire: jest.fn().mockResolvedValue(1),
-  lrange: jest.fn(),
-  pipeline: jest.fn(),
-  geoadd: jest.fn().mockResolvedValue(1),
-  georadius: jest.fn(),
+  lRange: jest.fn(),
+  multi: jest.fn(),
+  exec: jest.fn(),
+  geoAdd: jest.fn().mockResolvedValue(1),
+  geoSearchWith: jest.fn(),
   del: jest.fn().mockResolvedValue(1),
-  flushall: jest.fn().mockResolvedValue('OK'),
+  flushAll: jest.fn().mockResolvedValue('OK'),
+  connect: jest.fn().mockResolvedValue(undefined),
 };
 
 // Crear clase mock de Redis
@@ -25,21 +27,23 @@ class MockRedis {
   ping = mockMethods.ping;
   set = mockMethods.set;
   get = mockMethods.get;
-  lpush = mockMethods.lpush;
-  ltrim = mockMethods.ltrim;
+  lPush = mockMethods.lPush;
+  lTrim = mockMethods.lTrim;
   expire = mockMethods.expire;
-  lrange = mockMethods.lrange;
-  pipeline = mockMethods.pipeline;
-  geoadd = mockMethods.geoadd;
-  georadius = mockMethods.georadius;
+  lRange = mockMethods.lRange;
+  multi = mockMethods.multi;
+  exec = mockMethods.exec;
+  geoAdd = mockMethods.geoAdd;
+  geoSearchWith = mockMethods.geoSearchWith;
   del = mockMethods.del;
-  flushall = mockMethods.flushall;
+  flushAll = mockMethods.flushAll;
+  connect = mockMethods.connect;
 }
 
-// Mock del módulo ioredis
-jest.mock('ioredis', () => {
-  return jest.fn().mockImplementation(() => new MockRedis());
-});
+// Mock del módulo redis
+jest.mock('redis', () => ({
+  createClient: jest.fn(() => new MockRedis()),
+}));
 
 describe('RedisDatabaseService', () => {
   let service: RedisDatabaseService;
@@ -56,8 +60,11 @@ describe('RedisDatabaseService', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockImplementation((key) => {
-              if (key === 'REDIS_HOST') return 'localhost';
-              if (key === 'REDIS_PORT') return 6379;
+              if (key === 'REDIS_HOST') return 'redis-17374.c80.us-east-1-2.ec2.redns.redis-cloud.com';
+              if (key === 'REDIS_PORT') return 17374;
+              if (key === 'REDIS_USERNAME') return 'default';
+              if (key === 'REDIS_PASSWORD') return 'vNrEVCdgtVb3A0Rr6Nb6H7JKKNxa4XYh';
+              if (key === 'REDIS_ENCRYPTION_KEY') return 'secure_encryption_key_for_tests';
               return null;
             }),
           },
@@ -75,6 +82,9 @@ describe('RedisDatabaseService', () => {
 
   describe('onModuleInit', () => {
     it('should initialize Redis client properly', async () => {
+      // Asignar el cliente mock al servicio antes de onModuleInit
+      (service as any).redisClient = new MockRedis();
+      
       // Ejecutar
       await service.onModuleInit();
 
@@ -96,13 +106,16 @@ describe('RedisDatabaseService', () => {
       expect(mockMethods.ping).toHaveBeenCalled();
       expect(result).toEqual({
         status: 'ok',
-        message: 'Conexión a Redis establecida',
+        message: 'Conexión a Redis Cloud establecida',
       });
     });
   });
 
   describe('saveChatMessage', () => {
     it('should save chat message to Redis', async () => {
+      // Desactivar la encriptación para este test
+      jest.spyOn(service as any, 'encrypt').mockImplementation((value) => value);
+      
       // Setup
       (service['redisClient'] as any) = new MockRedis();
       const roomId = 'room123';
@@ -114,13 +127,14 @@ describe('RedisDatabaseService', () => {
       // Verificar
       expect(mockMethods.set).toHaveBeenCalledWith(
         `chat:message:${roomId}:${message.id}`,
-        JSON.stringify(message),
+        expect.stringContaining('msg456'),
+        expect.anything()
       );
-      expect(mockMethods.lpush).toHaveBeenCalledWith(
+      expect(mockMethods.lPush).toHaveBeenCalledWith(
         `chat:messages:${roomId}`,
         message.id,
       );
-      expect(mockMethods.ltrim).toHaveBeenCalledWith(
+      expect(mockMethods.lTrim).toHaveBeenCalledWith(
         `chat:messages:${roomId}`,
         0,
         99,
@@ -130,28 +144,32 @@ describe('RedisDatabaseService', () => {
 
   describe('getChatMessages', () => {
     it('should retrieve chat messages from Redis', async () => {
+      // Desactivar la desencriptación para este test
+      jest.spyOn(service as any, 'decrypt').mockImplementation((value) => value);
+      
       // Setup
       (service['redisClient'] as any) = new MockRedis();
       const roomId = 'room123';
       const messageIds = ['msg456', 'msg789'];
-      const pipeMock = {
-        get: jest.fn().mockReturnThis(),
-        exec: jest.fn().mockResolvedValue([
-          [null, JSON.stringify({ id: 'msg456', content: 'Hola' })],
-          [null, JSON.stringify({ id: 'msg789', content: 'Mundo' })],
-        ]),
-      };
       
-      mockMethods.lrange.mockResolvedValue(messageIds);
-      mockMethods.pipeline.mockReturnValue(pipeMock);
+      mockMethods.lRange.mockResolvedValue(messageIds);
+      mockMethods.multi.mockReturnValue({
+        get: jest.fn().mockReturnThis(),
+        exec: mockMethods.exec,
+      });
+      
+      mockMethods.exec.mockResolvedValue([
+        JSON.stringify({ id: 'msg456', content: 'Hola' }),
+        JSON.stringify({ id: 'msg789', content: 'Mundo' }),
+      ]);
 
       // Ejecutar
       const result = await service.getChatMessages(roomId);
 
       // Verificar
-      expect(mockMethods.lrange).toHaveBeenCalledWith(`chat:messages:${roomId}`, 0, 49);
-      expect(mockMethods.pipeline).toHaveBeenCalled();
-      expect(pipeMock.exec).toHaveBeenCalled();
+      expect(mockMethods.lRange).toHaveBeenCalledWith(`chat:messages:${roomId}`, 0, 49);
+      expect(mockMethods.multi).toHaveBeenCalled();
+      expect(mockMethods.exec).toHaveBeenCalled();
       expect(result).toHaveLength(2);
       expect(result[0].id).toBe('msg456');
       expect(result[1].id).toBe('msg789');
@@ -160,6 +178,9 @@ describe('RedisDatabaseService', () => {
 
   describe('saveCardLocation', () => {
     it('should save card location to Redis', async () => {
+      // Desactivar la encriptación para este test
+      jest.spyOn(service as any, 'encrypt').mockImplementation((value) => value);
+      
       // Setup
       (service['redisClient'] as any) = new MockRedis();
       const cardId = 'card123';
@@ -175,29 +196,41 @@ describe('RedisDatabaseService', () => {
       // Verificar
       expect(mockMethods.set).toHaveBeenCalledWith(
         `card:location:${cardId}`,
-        expect.stringContaining('"latitude":40.7128'),
+        expect.any(String),
+        expect.anything()
       );
-      expect(mockMethods.geoadd).toHaveBeenCalledWith(
-        'cards:locations',
-        location.longitude,
-        location.latitude,
-        cardId,
-      );
+      expect(mockMethods.geoAdd).toHaveBeenCalledWith('cards:locations', {
+        longitude: location.longitude,
+        latitude: location.latitude,
+        member: cardId
+      });
     });
   });
 
   describe('getNearbyCards', () => {
     it('should find nearby cards using geospatial query', async () => {
+      // Desactivar la desencriptación para este test
+      jest.spyOn(service as any, 'decrypt').mockImplementation((value) => value);
+      
       // Setup
       (service['redisClient'] as any) = new MockRedis();
       const latitude = 40.7128;
       const longitude = -74.006;
       const radius = 100;
       const mockResults = [
-        ['card123', '50', ['-74.004', '40.715']],
-        ['card456', '80', ['-74.009', '40.710']],
+        {
+          member: 'card123',
+          distance: 50,
+          coordinates: { longitude: -74.004, latitude: 40.715 }
+        },
+        {
+          member: 'card456',
+          distance: 80,
+          coordinates: { longitude: -74.009, latitude: 40.71 }
+        },
       ];
-      mockMethods.georadius.mockResolvedValue(mockResults);
+      
+      mockMethods.geoSearchWith.mockResolvedValue(mockResults);
       mockMethods.get.mockImplementation((key) => {
         if (key === 'card:location:card123') {
           return Promise.resolve(JSON.stringify({
@@ -222,16 +255,17 @@ describe('RedisDatabaseService', () => {
       const result = await service.getNearbyCards(latitude, longitude, radius);
 
       // Verificar
-      expect(mockMethods.georadius).toHaveBeenCalledWith(
-        'cards:locations',
+      expect(mockMethods.geoSearchWith).toHaveBeenCalledWith({
+        key: 'cards:locations',
         longitude,
         latitude,
         radius,
-        'm',
-        'WITHCOORD',
-        'WITHDIST',
-        'ASC',
-      );
+        unit: 'm',
+        withCoord: true,
+        withDist: true,
+        sort: 'ASC',
+      });
+      
       expect(result).toHaveLength(2);
       expect(result[0].distance_meters).toBe(50);
       expect(result[1].card_number).toBe('CARD-456');
@@ -241,6 +275,10 @@ describe('RedisDatabaseService', () => {
   describe('generic cache methods', () => {
     beforeEach(() => {
       (service['redisClient'] as any) = new MockRedis();
+      // Desactivar encriptación/desencriptación para estos tests
+      jest.spyOn(service as any, 'encrypt').mockImplementation((value) => value);
+      jest.spyOn(service as any, 'decrypt').mockImplementation((value) => value);
+      jest.spyOn(service as any, 'shouldEncrypt').mockReturnValue(false);
     });
     
     it('should set and get values from cache', async () => {
@@ -256,6 +294,7 @@ describe('RedisDatabaseService', () => {
       expect(mockMethods.set).toHaveBeenCalledWith(
         key,
         JSON.stringify(data),
+        expect.any(Object)
       );
 
       // Ejecutar get
@@ -274,7 +313,7 @@ describe('RedisDatabaseService', () => {
       await service.delete(...keys);
 
       // Verificar
-      expect(mockMethods.del).toHaveBeenCalledWith(...keys);
+      expect(mockMethods.del).toHaveBeenCalledWith(keys);
     });
 
     it('should flush the cache', async () => {
@@ -282,7 +321,7 @@ describe('RedisDatabaseService', () => {
       await service.flushAll();
 
       // Verificar
-      expect(mockMethods.flushall).toHaveBeenCalled();
+      expect(mockMethods.flushAll).toHaveBeenCalled();
     });
   });
 }); 

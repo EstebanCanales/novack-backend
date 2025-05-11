@@ -4,31 +4,41 @@ import {
   ExecutionContext,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { JwtService } from '@nestjs/jwt';
+import { Reflector } from '@nestjs/core';
+import { TokenService } from '../services/token.service';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private tokenService: TokenService,
+    private reflector: Reflector
+  ) {}
 
-  canActivate(
-    context: ExecutionContext,
-  ): boolean | Promise<boolean> | Observable<boolean> {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Verificar si la ruta está marcada como pública
+    const isPublic = this.reflector.getAllAndOverride<boolean>(
+      IS_PUBLIC_KEY,
+      [context.getHandler(), context.getClass()]
+    );
+
+    if (isPublic) {
+      return true;
+    }
+
     const request = context.switchToHttp().getRequest();
 
     try {
       const authHeader = request.headers.authorization;
 
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        throw new UnauthorizedException(
-          'Token de autenticación no proporcionado',
-        );
+        throw new UnauthorizedException('Token de autenticación no proporcionado');
       }
 
       const token = authHeader.replace('Bearer ', '');
-      const payload = this.jwtService.verify(token);
+      const payload = await this.tokenService.validateToken(token);
 
-      // Guardar información del usuario en el request
+      // Guardar información del usuario en el request para uso posterior
       request.user = payload;
 
       return true;

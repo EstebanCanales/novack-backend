@@ -1,9 +1,9 @@
-import { IsString, IsNotEmpty, Length } from 'class-validator';
+import { IsString, IsNotEmpty, Length, MinLength, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class Enable2FADto {
   @ApiProperty({
-    description: 'Código de verificación de 6 dígitos enviado por correo',
+    description: 'Código de verificación proporcionado por la app o enviado por correo',
     example: '123456',
     minLength: 6,
     maxLength: 6,
@@ -16,7 +16,7 @@ export class Enable2FADto {
 
 export class Verify2FADto {
   @ApiProperty({
-    description: 'Código de verificación de 6 dígitos',
+    description: 'Código de verificación proporcionado por la app o enviado por correo',
     example: '123456',
     minLength: 6,
     maxLength: 6,
@@ -29,7 +29,7 @@ export class Verify2FADto {
 
 export class Disable2FADto {
   @ApiProperty({
-    description: 'Código de verificación de 6 dígitos',
+    description: 'Código de verificación proporcionado por la app o enviado por correo',
     example: '123456',
     minLength: 6,
     maxLength: 6,
@@ -47,5 +47,18 @@ export class RecoveryCodeDto {
   })
   @IsString()
   @IsNotEmpty()
+  code: string;
+}
+
+// Alias de RecoveryCodeDto para mantener compatibilidad con el código existente
+export class BackupCodeDto {
+  @ApiProperty({
+    description: 'Código de respaldo para casos de emergencia cuando no se puede usar 2FA',
+    example: 'Z45PJK8SD3',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(8)
+  @MaxLength(12)
   code: string;
 } 
