@@ -4,9 +4,11 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuthService } from '../auth.service';
 import { EmployeeService } from '../employee.service';
-import { Employee, EmployeeAuth, Supplier } from '../../../domain/entities';
+import { TokenService } from '../token.service';
+import { Employee, EmployeeAuth, RefreshToken, Supplier } from '../../../domain/entities';
 import { UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { Request } from 'express';
 
 jest.mock('bcrypt');
 
@@ -14,8 +16,10 @@ describe('AuthService', () => {
   let service: AuthService;
   let mockJwtService: Partial<JwtService>;
   let mockEmployeeService: Partial<EmployeeService>;
+  let mockTokenService: Partial<TokenService>;
   let mockEmployeeRepository: Partial<Repository<Employee>>;
   let mockEmployeeAuthRepository: Partial<Repository<EmployeeAuth>>;
+  let mockRefreshTokenRepository: Partial<Repository<RefreshToken>>;
 
   beforeEach(async () => {
     mockJwtService = {
@@ -27,11 +31,32 @@ describe('AuthService', () => {
       findByEmail: jest.fn(),
     };
 
+    mockTokenService = {
+      generateTokens: jest.fn().mockResolvedValue({
+        access_token: 'test.access.token',
+        refresh_token: 'test.refresh.token',
+        expires_in: 900,
+        token_type: 'Bearer',
+      }),
+      refreshAccessToken: jest.fn().mockResolvedValue({
+        access_token: 'new.access.token',
+        refresh_token: 'new.refresh.token',
+        expires_in: 900,
+        token_type: 'Bearer',
+      }),
+      revokeToken: jest.fn().mockResolvedValue(true),
+      validateToken: jest.fn().mockResolvedValue({ sub: 'test-id' }),
+    };
+
     mockEmployeeRepository = {
       findOne: jest.fn(),
     };
 
     mockEmployeeAuthRepository = {
+      save: jest.fn(),
+    };
+
+    mockRefreshTokenRepository = {
       save: jest.fn(),
     };
 
@@ -47,12 +72,20 @@ describe('AuthService', () => {
           useValue: mockEmployeeService,
         },
         {
+          provide: TokenService,
+          useValue: mockTokenService,
+        },
+        {
           provide: getRepositoryToken(Employee),
           useValue: mockEmployeeRepository,
         },
         {
           provide: getRepositoryToken(EmployeeAuth),
           useValue: mockEmployeeAuthRepository,
+        },
+        {
+          provide: getRepositoryToken(RefreshToken),
+          useValue: mockRefreshTokenRepository,
         },
       ],
     }).compile();
@@ -198,14 +231,29 @@ describe('AuthService', () => {
       deleted_at: null,
       supplier: { id: 'supplier-id' } as Supplier,
     };
+    
+    const mockRequest = {
+      headers: {
+        'user-agent': 'test-user-agent',
+      },
+      ip: '127.0.0.1',
+    } as unknown as Request;
 
     it('should return access token and employee data on successful login', async () => {
       jest.spyOn(service, 'validateEmployee').mockResolvedValueOnce(mockEmployee);
+      
+      const tokenResult = {
+        access_token: 'test.access.token',
+        refresh_token: 'test.refresh.token',
+        expires_in: 900,
+        token_type: 'Bearer',
+      };
+      (mockTokenService.generateTokens as jest.Mock).mockResolvedValueOnce(tokenResult);
 
-      const result = await service.login(mockEmail, mockPassword);
+      const result = await service.login(mockEmail, mockPassword, mockRequest);
 
       expect(result).toEqual({
-        access_token: expect.any(String),
+        ...tokenResult,
         employee: {
           id: mockEmployee.id,
           name: mockEmployee.name,
@@ -214,21 +262,39 @@ describe('AuthService', () => {
           supplier: mockEmployee.supplier,
         },
       });
-      expect(mockJwtService.signAsync).toHaveBeenCalledWith({
-        sub: mockEmployee.id,
-        email: mockEmployee.email,
-        name: mockEmployee.name,
-        is_creator: mockEmployee.is_creator,
-        supplier_id: mockEmployee.supplier.id,
-      });
+      expect(mockTokenService.generateTokens).toHaveBeenCalledWith(mockEmployee, mockRequest);
     });
 
     it('should throw UnauthorizedException on invalid credentials', async () => {
       jest.spyOn(service, 'validateEmployee').mockRejectedValueOnce(new UnauthorizedException());
 
-      await expect(service.login(mockEmail, mockPassword))
+      await expect(service.login(mockEmail, mockPassword, mockRequest))
         .rejects
         .toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('refreshToken', () => {
+    const mockToken = 'valid.refresh.token';
+    const mockRequest = {} as Request;
+    
+    it('should return new tokens', async () => {
+      const result = await service.refreshToken(mockToken, mockRequest);
+      
+      expect(result).toHaveProperty('access_token');
+      expect(result).toHaveProperty('refresh_token');
+      expect(mockTokenService.refreshAccessToken).toHaveBeenCalledWith(mockToken, mockRequest);
+    });
+  });
+  
+  describe('logout', () => {
+    const mockToken = 'valid.refresh.token';
+    
+    it('should revoke the refresh token', async () => {
+      const result = await service.logout(mockToken);
+      
+      expect(result).toBe(true);
+      expect(mockTokenService.revokeToken).toHaveBeenCalledWith(mockToken);
     });
   });
 
@@ -237,15 +303,16 @@ describe('AuthService', () => {
 
     it('should return payload for valid token', async () => {
       const mockPayload = { sub: 'test-id' };
-      (mockJwtService.verifyAsync as jest.Mock).mockResolvedValueOnce(mockPayload);
+      (mockTokenService.validateToken as jest.Mock).mockResolvedValueOnce(mockPayload);
 
       const result = await service.validateToken(mockToken);
 
       expect(result).toEqual(mockPayload);
+      expect(mockTokenService.validateToken).toHaveBeenCalledWith(mockToken);
     });
 
     it('should throw UnauthorizedException for invalid token', async () => {
-      (mockJwtService.verifyAsync as jest.Mock).mockRejectedValueOnce(new Error());
+      (mockTokenService.validateToken as jest.Mock).mockRejectedValueOnce(new UnauthorizedException());
 
       await expect(service.validateToken(mockToken))
         .rejects

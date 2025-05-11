@@ -25,6 +25,12 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ESP32Module } from './application/modules/esp32.module';
 import { DatabaseResetModule } from './application/modules/database-reset.module';
 import { ChatModule } from './application/modules/chat.module';
+import { CsrfModule } from './application/modules/csrf.module';
+import { EncryptionModule } from './application/modules/encryption.module';
+import { AuditModule } from './application/modules/audit.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { DataMaskingInterceptor } from './application/interceptors/data-masking.interceptor';
+import { RedisTestController } from './interface/controllers/redis-test.controller';
 
 /**
  * Root module of the application that configures and organizes all feature modules.
@@ -88,9 +94,12 @@ import { ChatModule } from './application/modules/chat.module';
     // ServiceModule,
 
     // Security and authentication modules
+    EncryptionModule, // Cifrado de datos sensibles
     SecurityModule, // General security configurations
     AuthModule, // Authentication and authorization
     TwoFactorAuthModule, // Two-factor authentication
+    CsrfModule, // CSRF protection
+    AuditModule, // Auditoría de accesos
 
     // Communication modules
     EmailModule, // Email service integration
@@ -116,7 +125,15 @@ import { ChatModule } from './application/modules/chat.module';
       }),
     }),
   ],
-  controllers: [],
-  providers: [],
+  controllers: [
+    RedisTestController
+  ],
+  providers: [
+    // Interceptor global para enmascarar datos sensibles
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: DataMaskingInterceptor,
+    },
+  ],
 })
 export class AppModule {}

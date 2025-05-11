@@ -1,10 +1,11 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { EmployeeService } from './employee.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Employee, EmployeeAuth } from '../../domain/entities';
+import { Employee, EmployeeAuth, RefreshToken } from '../../domain/entities';
 import * as bcrypt from 'bcrypt';
+import { TokenService } from './token.service';
+import { Request } from 'express';
 
 @Injectable()
 export class AuthService {
@@ -13,11 +14,13 @@ export class AuthService {
 
   constructor(
     private readonly employeeService: EmployeeService,
-    private readonly jwtService: JwtService,
+    private readonly tokenService: TokenService,
     @InjectRepository(Employee)
     private readonly employeeRepository: Repository<Employee>,
     @InjectRepository(EmployeeAuth)
     private readonly employeeAuthRepository: Repository<EmployeeAuth>,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepository: Repository<RefreshToken>,
   ) {}
 
   async validateEmployee(email: string, password: string) {
@@ -69,19 +72,20 @@ export class AuthService {
     return employee;
   }
 
-  async login(email: string, password: string) {
-    const employee = await this.validateEmployee(email, password);
+  async login(email: string, password: string, request?: Request) {
+    const validatedEmployee = await this.validateEmployee(email, password);
     
-    const payload = {
-      sub: employee.id,
-      email: employee.email,
-      name: employee.name,
-      is_creator: employee.is_creator,
-      supplier_id: employee.supplier?.id,
-    };
-
+    // Obtener el empleado completo con su relación auth
+    const employee = await this.employeeRepository.findOne({ 
+      where: { id: validatedEmployee.id },
+      relations: ['auth', 'supplier'] 
+    });
+    
+    // Generar tokens con el nuevo servicio
+    const tokens = await this.tokenService.generateTokens(employee, request);
+    
     return {
-      access_token: await this.jwtService.signAsync(payload),
+      ...tokens,
       employee: {
         id: employee.id,
         name: employee.name,
@@ -91,13 +95,16 @@ export class AuthService {
       },
     };
   }
-
+  
+  async refreshToken(token: string, request?: Request) {
+    return this.tokenService.refreshAccessToken(token, request);
+  }
+  
+  async logout(refreshToken: string) {
+    return this.tokenService.revokeToken(refreshToken);
+  }
+  
   async validateToken(token: string) {
-    try {
-      const payload = await this.jwtService.verifyAsync(token);
-      return payload;
-    } catch {
-      throw new UnauthorizedException('Token inválido');
-    }
+    return this.tokenService.validateToken(token);
   }
 } 

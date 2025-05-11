@@ -8,3 +8,4 @@ export * from './sensor.entity';
 export * from './chat-room.entity';
 export * from './chat-message.entity';
 export * from './login-attempt.entity';
+export * from './refresh-token.entity';

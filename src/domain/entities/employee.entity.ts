@@ -9,6 +9,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Supplier } from './supplier.entity';
+import { EmployeeAuth } from './employee-auth.entity';
 
 @Entity({ name: 'employees' })
 export class Employee {
@@ -43,6 +44,9 @@ export class Employee {
   two_factor_secret?: string;
 
   @Column({ nullable: true })
+  two_factor_method?: string;
+
+  @Column({ nullable: true })
   two_factor_recovery_codes?: string;
 
   @Column({ default: false })
@@ -68,4 +72,8 @@ export class Employee {
 
   @ManyToOne(() => Supplier, (supplier) => supplier.employees)
   supplier: Supplier;
+
+  @OneToOne(() => EmployeeAuth, auth => auth.employee)
+  @JoinColumn({ name: 'id', referencedColumnName: 'employee_id' })
+  auth: EmployeeAuth;
 }

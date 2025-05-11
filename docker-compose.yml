@@ -13,15 +13,21 @@ services:
       - DB_USERNAME=postgres
       - DB_PASSWORD=postgres
       - DB_NAME=spcedes
-      - JWT_SECRET=1234
-      - JWT_EXPIRATION=24h
+      - JWT_SECRET=UtahD6c3jgBkajP7eXmMu9E2FwGpRxQnSvCzKyV8ZfLtAqTs5bN4YdHr3WJ7mhk2
+      - JWT_ACCESS_EXPIRATION=15m
+      - JWT_REFRESH_EXPIRATION_DAYS=7
+      - JWT_AUDIENCE=https://api.spcedes.com
+      - JWT_ISSUER=SPCEDES_API
       - RESEND_API_KEY=${RESEND_API_KEY}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - ESP32_AUTH_KEY=esp32_secret_key_12345
+      - REDIS_HOST=redis-17374.c80.us-east-1-2.ec2.redns.redis-cloud.com
+      - REDIS_PORT=17374
+      - REDIS_USERNAME=default
+      - REDIS_PASSWORD=vNrEVCdgtVb3A0Rr6Nb6H7JKKNxa4XYh
+      - REDIS_TLS_ENABLED=true
+      - REDIS_ENCRYPTION_KEY=${REDIS_ENCRYPTION_KEY:-secure_encryption_key_for_redis_data}
+      - ESP32_AUTH_KEY=${ESP32_AUTH_KEY:-esp32_aQ9bP2cX8dZ7eW6fV5gT4hR3jS2kL1mN0}
     depends_on:
       - postgres
-      - redis
     networks:
       - app-network
 
@@ -43,19 +49,6 @@ services:
       retries: 5
     networks:
       - app-network
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - '6379:6379'
-    command: redis-server
-    networks:
-      - app-network
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
 volumes:
   postgres_data:

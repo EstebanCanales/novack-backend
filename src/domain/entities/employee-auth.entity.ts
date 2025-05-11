@@ -14,6 +14,13 @@ export class EmployeeAuth {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ name: 'employee_id' })
+  employee_id: string;
+
+  @OneToOne(() => Employee, employee => employee.auth)
+  @JoinColumn({ name: 'employee_id' })
+  employee: Employee;
+
   @Column()
   password: string;
 
@@ -41,16 +48,20 @@ export class EmployeeAuth {
   @Column({ nullable: true })
   locked_until?: Date;
 
-  @Column({ nullable: true })
-  last_login_at?: Date;
+  @Column({ nullable: true, type: 'timestamp' })
+  last_login_at: Date;
+
+  @Column({ type: 'jsonb', nullable: true })
+  backup_codes: Array<{
+    code: string;
+    created_at: string;
+    used: boolean;
+    used_at?: string;
+  }>;
 
   @CreateDateColumn()
   created_at: Date;
 
   @UpdateDateColumn()
   updated_at: Date;
-
-  @OneToOne(() => Employee)
-  @JoinColumn()
-  employee: Employee;
 } 
