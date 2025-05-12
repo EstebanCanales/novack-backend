@@ -31,6 +31,7 @@ import { AuditModule } from './application/modules/audit.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { DataMaskingInterceptor } from './application/interceptors/data-masking.interceptor';
 import { RedisTestController } from './interface/controllers/redis-test.controller';
+import { LoggingModule } from './infrastructure/logging/logging.module';
 
 /**
  * Root module of the application that configures and organizes all feature modules.
@@ -124,6 +125,7 @@ import { RedisTestController } from './interface/controllers/redis-test.controll
         signOptions: { expiresIn: '1d' },
       }),
     }),
+    LoggingModule,
   ],
   controllers: [
     RedisTestController

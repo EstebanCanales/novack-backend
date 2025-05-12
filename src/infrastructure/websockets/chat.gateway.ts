@@ -11,8 +11,8 @@ import { Server, Socket } from 'socket.io';
 import { UseGuards } from '@nestjs/common';
 import { ChatService } from 'src/application/services/chat.service';
 import { CreateMessageDto } from 'src/application/dtos/chat/create-message.dto';
-import { WsJwtGuard } from '../guards/ws-jwt.guard';
-import { WsAuthUser } from '../decorators/ws-auth-user.decorator';
+import { WsJwtGuard } from '../../application/guards/ws-jwt.guard';
+import { WsAuthUser } from '../../application/decorators/ws-auth-user.decorator';
 
 interface UserSocket extends Socket {
   user?: any;

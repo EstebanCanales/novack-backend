@@ -153,3 +153,63 @@ El sistema incluye un módulo de chat en tiempo real con WebSockets que permite:
 - `createPrivateRoom` - Crear sala privada con otro usuario
 - `getRoomMessages` - Obtener mensajes de una sala
 - `getUserRooms` - Obtener salas del usuario
+
+# Sistema de Logging Estructurado
+
+## Características
+
+El sistema de logging implementado ofrece las siguientes características:
+
+- Logs estructurados en formato JSON
+- Seguimiento de solicitudes con correlationId
+- Niveles de log configurables (debug, info, warn, error)
+- Integración con ELK Stack (Elasticsearch, Logstash, Kibana)
+- Soporte para logs en archivos y en consola
+- Contexto de ejecución para enriquecer los logs
+
+## Variables de entorno
+
+Configure las siguientes variables de entorno:
+
+```
+LOG_LEVEL=info               # debug, info, warn, error
+LOG_TO_FILE=true             # true o false
+ELK_ENABLED=true             # true o false
+ELK_HOST=http://localhost:9200
+APP_NAME=novack-backend
+```
+
+## Configuración de ELK Stack
+
+Para iniciar el stack ELK:
+
+```bash
+# Dar permisos de ejecución
+chmod +x scripts/setup-elk.sh
+
+# Ejecutar script de configuración
+./scripts/setup-elk.sh
+```
+
+El script configurará:
+
+- Elasticsearch: http://localhost:9200
+- Kibana: http://localhost:5601
+- Logstash escuchando en puerto 50000 y 5044
+
+## Uso del Logger
+
+```typescript
+// Inyectar el logger
+constructor(private logger: StructuredLoggerService) {
+  this.logger.setContext('MiServicio');
+}
+
+// Métodos disponibles
+this.logger.log('Mensaje informativo', null, { datos: 'adicionales' });
+this.logger.debug('Mensaje de depuración', null, { datos: 'adicionales' });
+this.logger.warn('Advertencia', null, { datos: 'adicionales' });
+this.logger.error('Error', null, errorStack, { datos: 'adicionales' });
+```
+
+El correlationId se propaga automáticamente entre solicitudes HTTP.

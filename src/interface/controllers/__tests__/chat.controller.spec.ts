@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ChatController } from '../chat.controller';
+import { ChatController } from '../../../interface/controllers/chat.controller';
 import { ChatService } from '../../../application/services/chat.service';
 import { AuthGuard } from '../../../application/guards/auth.guard';
 import { CreateMessageDto } from '../../../application/dtos/chat/create-message.dto';
