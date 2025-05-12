@@ -1,15 +1,20 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, RedisClientType } from 'redis';
 import * as crypto from 'crypto';
+import { StructuredLoggerService } from '../../logging/structured-logger.service';
 
 @Injectable()
 export class RedisDatabaseService implements OnModuleInit {
-  private readonly logger = new Logger(RedisDatabaseService.name);
   private redisClient: RedisClientType;
   private encryptionKey: Buffer;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private logger: StructuredLoggerService
+  ) {
+    this.logger.setContext(RedisDatabaseService.name);
+    
     // Crear una clave de encriptación basada en una variable de entorno o generar una
     const encryptionKeyStr = this.configService.get<string>('REDIS_ENCRYPTION_KEY', 'defaultEncryptionKey123456789');
     // Crear una clave de 32 bytes (256 bits) usando una función hash
@@ -29,6 +34,14 @@ export class RedisDatabaseService implements OnModuleInit {
         const host = this.configService.get('REDIS_HOST', 'localhost');
         const port = parseInt(this.configService.get('REDIS_PORT', '6379'));
         
+        this.logger.debug('Configurando conexión a Redis Cloud', null, { 
+          useTLS, 
+          host, 
+          port,
+          username,
+          hasPassword: !!password
+        });
+        
         // Configuración para Redis Cloud usando la biblioteca redis oficial
         const clientOptions: any = {
           username,
@@ -43,7 +56,7 @@ export class RedisDatabaseService implements OnModuleInit {
             tls: true,
             reconnectStrategy: (retries: number) => {
               const delay = Math.min(retries * 50, 2000);
-              this.logger.log(`Reintento de conexión a Redis Cloud en ${delay}ms`);
+              this.logger.log(`Reintento de conexión a Redis Cloud en ${delay}ms`, null, { retries, delay });
               return delay;
             }
           };
@@ -53,7 +66,7 @@ export class RedisDatabaseService implements OnModuleInit {
             port,
             reconnectStrategy: (retries: number) => {
               const delay = Math.min(retries * 50, 2000);
-              this.logger.log(`Reintento de conexión a Redis Cloud en ${delay}ms`);
+              this.logger.log(`Reintento de conexión a Redis Cloud en ${delay}ms`, null, { retries, delay });
               return delay;
             }
           };
@@ -62,11 +75,19 @@ export class RedisDatabaseService implements OnModuleInit {
         this.redisClient = createClient(clientOptions);
 
         this.redisClient.on('connect', () => {
-          this.logger.log('Conexión a Redis Cloud establecida correctamente');
+          const currentContext = StructuredLoggerService.getCurrentContext();
+          this.logger.log('Conexión a Redis Cloud establecida correctamente', null, { 
+            correlationId: currentContext.correlationId
+          });
         });
 
         this.redisClient.on('error', (error) => {
-          this.logger.error(`Error en la conexión a Redis Cloud: ${error.message}`);
+          const currentContext = StructuredLoggerService.getCurrentContext();
+          this.logger.error(`Error en la conexión a Redis Cloud: ${error.message}`, null, error.stack, {
+            correlationId: currentContext.correlationId,
+            errorCode: error.code,
+            errorName: error.name
+          });
         });
 
         await this.redisClient.connect();
@@ -74,7 +95,12 @@ export class RedisDatabaseService implements OnModuleInit {
 
       await this.testConnection();
     } catch (error) {
-      this.logger.error(`Error al inicializar Redis Cloud: ${error.message}`);
+      const currentContext = StructuredLoggerService.getCurrentContext();
+      this.logger.error(`Error al inicializar Redis Cloud: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        errorCode: error.code,
+        errorName: error.name
+      });
       throw error;
     }
   }
@@ -85,7 +111,12 @@ export class RedisDatabaseService implements OnModuleInit {
       this.logger.log('Conexión a Redis Cloud verificada con éxito');
       return { status: 'ok', message: 'Conexión a Redis Cloud establecida' };
     } catch (error) {
-      this.logger.error(`Error al verificar conexión a Redis Cloud: ${error.message}`);
+      const currentContext = StructuredLoggerService.getCurrentContext();
+      this.logger.error(`Error al verificar conexión a Redis Cloud: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        errorCode: error.code,
+        errorName: error.name
+      });
       throw error;
     }
   }
@@ -106,7 +137,12 @@ export class RedisDatabaseService implements OnModuleInit {
       // Retornar el IV y el valor cifrado juntos
       return iv.toString('hex') + ':' + encrypted;
     } catch (error) {
-      this.logger.error(`Error al cifrar datos: ${error.message}`);
+      const currentContext = StructuredLoggerService.getCurrentContext();
+      this.logger.error(`Error al cifrar datos: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        errorCode: error.code,
+        errorName: error.name
+      });
       // En caso de error, retornar el valor original
       return value;
     }
@@ -132,7 +168,12 @@ export class RedisDatabaseService implements OnModuleInit {
       decrypted += decipher.final('utf8');
       return decrypted;
     } catch (error) {
-      this.logger.error(`Error al descifrar datos: ${error.message}`);
+      const currentContext = StructuredLoggerService.getCurrentContext();
+      this.logger.error(`Error al descifrar datos: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        errorCode: error.code,
+        errorName: error.name
+      });
       // En caso de error, retornar el valor original
       return encryptedValue;
     }
@@ -170,8 +211,16 @@ export class RedisDatabaseService implements OnModuleInit {
    * @param ttl Tiempo de vida en segundos (opcional)
    */
   async saveChatMessage(roomId: string, message: any, ttl?: number): Promise<void> {
+    const currentContext = StructuredLoggerService.getCurrentContext();
+    
     try {
       const key = `chat:message:${roomId}:${message.id}`;
+      
+      this.logger.debug('Guardando mensaje de chat', null, {
+        correlationId: currentContext.correlationId,
+        roomId,
+        messageId: message.id
+      });
       
       // Cifrar el contenido del mensaje si contiene información sensible
       const messageToSave = { ...message };
@@ -191,8 +240,20 @@ export class RedisDatabaseService implements OnModuleInit {
         await this.redisClient.expire(key, ttl);
         await this.redisClient.expire(`chat:messages:${roomId}`, ttl);
       }
+      
+      this.logger.debug('Mensaje de chat guardado correctamente', null, {
+        correlationId: currentContext.correlationId,
+        roomId,
+        messageId: message.id
+      });
     } catch (error) {
-      this.logger.error(`Error al guardar mensaje en caché: ${error.message}`);
+      this.logger.error(`Error al guardar mensaje en caché: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        roomId,
+        messageId: message?.id,
+        errorCode: error.code,
+        errorName: error.name
+      });
       throw error;
     }
   }
@@ -203,9 +264,17 @@ export class RedisDatabaseService implements OnModuleInit {
    * @param limit Número máximo de mensajes a recuperar
    */
   async getChatMessages(roomId: string, limit = 50): Promise<any[]> {
+    const currentContext = StructuredLoggerService.getCurrentContext();
+    
     try {
       // Asegurarse de que el límite sea un número entero válido
       const validLimit = Math.max(1, Math.min(parseInt(String(limit), 10) || 50, 100));
+      
+      this.logger.debug('Recuperando mensajes de chat', null, {
+        correlationId: currentContext.correlationId,
+        roomId,
+        limit: validLimit
+      });
       
       // Obtener los IDs de los mensajes más recientes
       // Asegurarse de que los parámetros sean números enteros
@@ -215,7 +284,19 @@ export class RedisDatabaseService implements OnModuleInit {
         validLimit - 1
       );
       
-      if (!messageIds || !messageIds.length) return [];
+      if (!messageIds || !messageIds.length) {
+        this.logger.debug('No se encontraron mensajes para la sala', null, {
+          correlationId: currentContext.correlationId,
+          roomId,
+        });
+        return [];
+      }
+      
+      this.logger.debug(`Se encontraron ${messageIds.length} mensajes en la sala`, null, {
+        correlationId: currentContext.correlationId,
+        roomId,
+        messageCount: messageIds.length
+      });
       
       // En lugar de usar multi.exec, recuperar los mensajes uno por uno
       const messages = [];
@@ -232,14 +313,29 @@ export class RedisDatabaseService implements OnModuleInit {
             messages.push(message);
           }
         } catch (e) {
-          this.logger.error(`Error al obtener mensaje ${msgId}: ${e.message}`);
+          this.logger.error(`Error al obtener mensaje ${msgId}: ${e.message}`, null, e.stack, {
+            correlationId: currentContext.correlationId,
+            roomId,
+            messageId: msgId
+          });
           // Continuar con el siguiente mensaje
         }
       }
       
+      this.logger.debug(`Se procesaron ${messages.length} mensajes correctamente`, null, {
+        correlationId: currentContext.correlationId,
+        roomId,
+        messageCount: messages.length
+      });
+      
       return messages;
     } catch (error) {
-      this.logger.error(`Error al recuperar mensajes de caché: ${error.message}`);
+      this.logger.error(`Error al recuperar mensajes de caché: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        roomId,
+        errorCode: error.code,
+        errorName: error.name
+      });
       return [];
     }
   }
@@ -250,15 +346,34 @@ export class RedisDatabaseService implements OnModuleInit {
    * @param ttl Tiempo de vida en segundos (opcional)
    */
   async saveChatRoom(room: any, ttl = 3600): Promise<void> {
+    const currentContext = StructuredLoggerService.getCurrentContext();
+    
     try {
       const key = `chat:room:${room.id}`;
+      
+      this.logger.debug('Guardando sala de chat', null, {
+        correlationId: currentContext.correlationId,
+        roomId: room.id
+      });
+      
       await this.redisClient.set(key, JSON.stringify(room));
       
       if (ttl) {
         await this.redisClient.expire(key, ttl);
       }
+      
+      this.logger.debug('Sala de chat guardada correctamente', null, {
+        correlationId: currentContext.correlationId,
+        roomId: room.id,
+        ttl
+      });
     } catch (error) {
-      this.logger.error(`Error al guardar sala en caché: ${error.message}`);
+      this.logger.error(`Error al guardar sala en caché: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        roomId: room?.id,
+        errorCode: error.code,
+        errorName: error.name
+      });
       throw error;
     }
   }
@@ -268,18 +383,39 @@ export class RedisDatabaseService implements OnModuleInit {
    * @param roomId ID de la sala de chat
    */
   async getChatRoom(roomId: string): Promise<any | null> {
+    const currentContext = StructuredLoggerService.getCurrentContext();
+    
     try {
+      this.logger.debug('Recuperando sala de chat', null, {
+        correlationId: currentContext.correlationId,
+        roomId
+      });
+      
       const data = await this.redisClient.get(`chat:room:${roomId}`);
-      if (!data) return null;
+      if (!data) {
+        this.logger.debug('No se encontró la sala de chat', null, {
+          correlationId: currentContext.correlationId,
+          roomId
+        });
+        return null;
+      }
       
       try {
         return JSON.parse(data as string);
       } catch (e) {
-        this.logger.error(`Error al parsear sala: ${e.message}`);
+        this.logger.error(`Error al parsear sala: ${e.message}`, null, e.stack, {
+          correlationId: currentContext.correlationId,
+          roomId
+        });
         return null;
       }
     } catch (error) {
-      this.logger.error(`Error al recuperar sala de caché: ${error.message}`);
+      this.logger.error(`Error al recuperar sala de caché: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        roomId,
+        errorCode: error.code,
+        errorName: error.name
+      });
       return null;
     }
   }
@@ -292,15 +428,39 @@ export class RedisDatabaseService implements OnModuleInit {
    * @param ttl Tiempo de vida en segundos (opcional)
    */
   async saveUserRooms(userId: string, userType: string, rooms: any[], ttl = 3600): Promise<void> {
+    const currentContext = StructuredLoggerService.getCurrentContext();
+    
     try {
       const key = `chat:user:${userType}:${userId}:rooms`;
+      
+      this.logger.debug('Guardando salas de usuario', null, {
+        correlationId: currentContext.correlationId,
+        userId,
+        userType,
+        roomCount: rooms.length
+      });
+      
       await this.redisClient.set(key, JSON.stringify(rooms));
       
       if (ttl) {
         await this.redisClient.expire(key, ttl);
       }
+      
+      this.logger.debug('Salas de usuario guardadas correctamente', null, {
+        correlationId: currentContext.correlationId,
+        userId,
+        userType,
+        roomCount: rooms.length,
+        ttl
+      });
     } catch (error) {
-      this.logger.error(`Error al guardar salas de usuario en caché: ${error.message}`);
+      this.logger.error(`Error al guardar salas de usuario en caché: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        userId,
+        userType,
+        errorCode: error.code,
+        errorName: error.name
+      });
       throw error;
     }
   }
@@ -311,18 +471,43 @@ export class RedisDatabaseService implements OnModuleInit {
    * @param userType Tipo de usuario (employee o visitor)
    */
   async getUserRooms(userId: string, userType: string): Promise<any[]> {
+    const currentContext = StructuredLoggerService.getCurrentContext();
+    
     try {
+      this.logger.debug('Recuperando salas de usuario', null, {
+        correlationId: currentContext.correlationId,
+        userId,
+        userType
+      });
+      
       const data = await this.redisClient.get(`chat:user:${userType}:${userId}:rooms`);
-      if (!data) return [];
+      if (!data) {
+        this.logger.debug('No se encontraron salas para el usuario', null, {
+          correlationId: currentContext.correlationId,
+          userId,
+          userType
+        });
+        return [];
+      }
       
       try {
         return JSON.parse(data as string);
       } catch (e) {
-        this.logger.error(`Error al parsear salas: ${e.message}`);
+        this.logger.error(`Error al parsear salas: ${e.message}`, null, e.stack, {
+          correlationId: currentContext.correlationId,
+          userId,
+          userType
+        });
         return [];
       }
     } catch (error) {
-      this.logger.error(`Error al recuperar salas de usuario de caché: ${error.message}`);
+      this.logger.error(`Error al recuperar salas de usuario de caché: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        userId,
+        userType,
+        errorCode: error.code,
+        errorName: error.name
+      });
       return [];
     }
   }
@@ -336,8 +521,15 @@ export class RedisDatabaseService implements OnModuleInit {
    * @param ttl Tiempo de vida en segundos (opcional)
    */
   async saveCardLocation(cardId: string, location: any, ttl = 3600): Promise<void> {
+    const currentContext = StructuredLoggerService.getCurrentContext();
+    
     try {
       const key = `card:location:${cardId}`;
+      
+      this.logger.debug('Guardando ubicación de tarjeta', null, {
+        correlationId: currentContext.correlationId,
+        cardId
+      });
       
       // Las ubicaciones son datos sensibles, cifrar la información
       const locationToSave = {
@@ -364,9 +556,27 @@ export class RedisDatabaseService implements OnModuleInit {
           latitude: location.latitude,
           member: cardId
         });
+        
+        this.logger.debug('Ubicación de tarjeta añadida al índice geoespacial', null, {
+          correlationId: currentContext.correlationId,
+          cardId,
+          latitude: location.latitude,
+          longitude: location.longitude
+        });
       }
+      
+      this.logger.debug('Ubicación de tarjeta guardada correctamente', null, {
+        correlationId: currentContext.correlationId,
+        cardId,
+        ttl
+      });
     } catch (error) {
-      this.logger.error(`Error al guardar ubicación de tarjeta en caché: ${error.message}`);
+      this.logger.error(`Error al guardar ubicación de tarjeta en caché: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        cardId,
+        errorCode: error.code,
+        errorName: error.name
+      });
       throw error;
     }
   }
@@ -376,9 +586,22 @@ export class RedisDatabaseService implements OnModuleInit {
    * @param cardId ID de la tarjeta
    */
   async getCardLocation(cardId: string): Promise<any | null> {
+    const currentContext = StructuredLoggerService.getCurrentContext();
+    
     try {
+      this.logger.debug('Recuperando ubicación de tarjeta', null, {
+        correlationId: currentContext.correlationId,
+        cardId
+      });
+      
       const data = await this.redisClient.get(`card:location:${cardId}`);
-      if (!data) return null;
+      if (!data) {
+        this.logger.debug('No se encontró ubicación para la tarjeta', null, {
+          correlationId: currentContext.correlationId,
+          cardId
+        });
+        return null;
+      }
       
       try {
         const location = JSON.parse(data as string);
@@ -392,13 +615,27 @@ export class RedisDatabaseService implements OnModuleInit {
           location.longitude = parseFloat(this.decrypt(location.longitude));
         }
         
+        this.logger.debug('Ubicación de tarjeta recuperada correctamente', null, {
+          correlationId: currentContext.correlationId,
+          cardId,
+          hasCoordinates: !!(location.latitude && location.longitude)
+        });
+        
         return location;
       } catch (e) {
-        this.logger.error(`Error al parsear ubicación: ${e.message}`);
+        this.logger.error(`Error al parsear ubicación: ${e.message}`, null, e.stack, {
+          correlationId: currentContext.correlationId,
+          cardId
+        });
         return null;
       }
     } catch (error) {
-      this.logger.error(`Error al recuperar ubicación de tarjeta de caché: ${error.message}`);
+      this.logger.error(`Error al recuperar ubicación de tarjeta de caché: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        cardId,
+        errorCode: error.code,
+        errorName: error.name
+      });
       return null;
     }
   }
@@ -410,7 +647,16 @@ export class RedisDatabaseService implements OnModuleInit {
    * @param radius Radio en metros
    */
   async getNearbyCards(latitude: number, longitude: number, radius = 100): Promise<any[]> {
+    const currentContext = StructuredLoggerService.getCurrentContext();
+    
     try {
+      this.logger.debug('Buscando tarjetas cercanas', null, {
+        correlationId: currentContext.correlationId,
+        latitude,
+        longitude,
+        radius
+      });
+      
       const results = await this.redisClient.sendCommand([
         'GEOSEARCH', 
         'cards:locations', 
@@ -424,7 +670,15 @@ export class RedisDatabaseService implements OnModuleInit {
         '50'
       ]) as unknown as string[];
       
-      if (!results || !results.length) return [];
+      if (!results || !results.length) {
+        this.logger.debug('No se encontraron tarjetas cercanas', null, {
+          correlationId: currentContext.correlationId,
+          latitude,
+          longitude,
+          radius
+        });
+        return [];
+      }
       
       // Usar sendCommand para ejecutar GEOSEARCH con WITHDIST y WITHCOORD
       const cardsWithDistances = await this.redisClient.sendCommand([
@@ -442,7 +696,23 @@ export class RedisDatabaseService implements OnModuleInit {
         '50'
       ]) as unknown as Array<[string, string, [string, string]]>;
       
-      if (!cardsWithDistances || !cardsWithDistances.length) return [];
+      if (!cardsWithDistances || !cardsWithDistances.length) {
+        this.logger.debug('No se pudieron obtener detalles de tarjetas cercanas', null, {
+          correlationId: currentContext.correlationId,
+          latitude,
+          longitude,
+          radius
+        });
+        return [];
+      }
+      
+      this.logger.debug(`Se encontraron ${cardsWithDistances.length} tarjetas cercanas`, null, {
+        correlationId: currentContext.correlationId,
+        latitude,
+        longitude,
+        radius,
+        cardCount: cardsWithDistances.length
+      });
       
       const cards = [];
       
@@ -469,9 +739,21 @@ export class RedisDatabaseService implements OnModuleInit {
         }
       }
       
+      this.logger.debug(`Se procesaron ${cards.length} tarjetas con datos completos`, null, {
+        correlationId: currentContext.correlationId,
+        cardCount: cards.length
+      });
+      
       return cards;
     } catch (error) {
-      this.logger.error(`Error al buscar tarjetas cercanas: ${error.message}`);
+      this.logger.error(`Error al buscar tarjetas cercanas: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        latitude,
+        longitude,
+        radius,
+        errorCode: error.code,
+        errorName: error.name
+      });
       return [];
     }
   }
@@ -483,8 +765,16 @@ export class RedisDatabaseService implements OnModuleInit {
    * @param ttl Tiempo de vida en segundos (opcional)
    */
   async set(key: string, data: any, ttl?: number): Promise<void> {
+    const currentContext = StructuredLoggerService.getCurrentContext();
+    
     try {
       const shouldEncryptData = this.shouldEncrypt(key, data);
+      
+      this.logger.debug('Guardando datos en caché', null, {
+        correlationId: currentContext.correlationId,
+        key,
+        encrypted: shouldEncryptData
+      });
       
       let valueToStore: string;
       if (shouldEncryptData) {
@@ -503,8 +793,19 @@ export class RedisDatabaseService implements OnModuleInit {
       }
       
       await this.redisClient.set(key, valueToStore, options);
+      
+      this.logger.debug('Datos guardados correctamente en caché', null, {
+        correlationId: currentContext.correlationId,
+        key,
+        ttl
+      });
     } catch (error) {
-      this.logger.error(`Error al guardar datos en caché: ${error.message}`);
+      this.logger.error(`Error al guardar datos en caché: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        key,
+        errorCode: error.code,
+        errorName: error.name
+      });
       throw error;
     }
   }
@@ -514,28 +815,62 @@ export class RedisDatabaseService implements OnModuleInit {
    * @param key Clave
    */
   async get<T = any>(key: string): Promise<T | null> {
+    const currentContext = StructuredLoggerService.getCurrentContext();
+    
     try {
+      this.logger.debug('Recuperando datos de caché', null, {
+        correlationId: currentContext.correlationId,
+        key
+      });
+      
       const data = await this.redisClient.get(key);
-      if (!data) return null;
+      if (!data) {
+        this.logger.debug('No se encontraron datos en caché', null, {
+          correlationId: currentContext.correlationId,
+          key
+        });
+        return null;
+      }
       
       const shouldBeEncrypted = this.shouldEncrypt(key, data);
       
       if (shouldBeEncrypted && typeof data === 'string' && data.includes(':')) {
         const decrypted = this.decrypt(data);
         try {
+          this.logger.debug('Datos descifrados y parseados correctamente', null, {
+            correlationId: currentContext.correlationId,
+            key
+          });
           return JSON.parse(decrypted) as T;
         } catch {
+          this.logger.debug('Datos descifrados correctamente', null, {
+            correlationId: currentContext.correlationId,
+            key
+          });
           return decrypted as unknown as T;
         }
       }
       
       try {
+        this.logger.debug('Datos recuperados y parseados correctamente', null, {
+          correlationId: currentContext.correlationId,
+          key
+        });
         return JSON.parse(data as string) as T;
       } catch {
+        this.logger.debug('Datos recuperados correctamente', null, {
+          correlationId: currentContext.correlationId,
+          key
+        });
         return data as unknown as T;
       }
     } catch (error) {
-      this.logger.error(`Error al recuperar datos de caché: ${error.message}`);
+      this.logger.error(`Error al recuperar datos de caché: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        key,
+        errorCode: error.code,
+        errorName: error.name
+      });
       return null;
     }
   }
@@ -545,12 +880,29 @@ export class RedisDatabaseService implements OnModuleInit {
    * @param keys Lista de claves a eliminar
    */
   async delete(...keys: string[]): Promise<void> {
+    const currentContext = StructuredLoggerService.getCurrentContext();
+    
     try {
       if (keys.length) {
+        this.logger.debug(`Eliminando ${keys.length} claves de caché`, null, {
+          correlationId: currentContext.correlationId,
+          keys
+        });
+        
         await this.redisClient.del(keys);
+        
+        this.logger.debug('Claves eliminadas correctamente', null, {
+          correlationId: currentContext.correlationId,
+          keys
+        });
       }
     } catch (error) {
-      this.logger.error(`Error al eliminar datos de caché: ${error.message}`);
+      this.logger.error(`Error al eliminar datos de caché: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        keys,
+        errorCode: error.code,
+        errorName: error.name
+      });
       throw error;
     }
   }
@@ -559,11 +911,24 @@ export class RedisDatabaseService implements OnModuleInit {
    * Limpia todos los datos de la caché
    */
   async flushAll(): Promise<void> {
+    const currentContext = StructuredLoggerService.getCurrentContext();
+    
     try {
+      this.logger.warn('Limpiando toda la caché', null, {
+        correlationId: currentContext.correlationId
+      });
+      
       await this.redisClient.flushAll();
-      this.logger.log('Caché limpiada completamente');
+      
+      this.logger.log('Caché limpiada completamente', null, {
+        correlationId: currentContext.correlationId
+      });
     } catch (error) {
-      this.logger.error(`Error al limpiar caché: ${error.message}`);
+      this.logger.error(`Error al limpiar caché: ${error.message}`, null, error.stack, {
+        correlationId: currentContext.correlationId,
+        errorCode: error.code,
+        errorName: error.name
+      });
       throw error;
     }
   }
