@@ -1,5 +1,6 @@
 # Novack Backend
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/EstebanCanales/novack-backend)
 ## Description
 
 Backend service for Novack project built with NestJS. This system provides a robust API for managing access control, employee management, visitor tracking, and security monitoring in corporate environments.
