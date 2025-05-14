@@ -4,10 +4,29 @@ filebeat.inputs:
     enabled: true
     paths:
       - /var/log/app_logs/*.log
+      - ${path.config}/../../logs/*.log # Ruta relativa para desarrollo
+    harvester_limit: 5
+    scan_frequency: 10s
+    backoff: '1s'
+    max_backoff: '10s'
+    fields:
+      app: 'novack-backend'
+      environment: 'development'
+    fields_under_root: true
+    json.keys_under_root: true
+    json.message_key: 'message'
+    json.overwrite_keys: true
 
   - type: container
     paths:
       - '/var/lib/docker/containers/*/*.log'
+    harvester_limit: 5
+    backoff: '1s'
+    max_backoff: '10s'
+    fields:
+      source: 'docker'
+      environment: 'development'
+    fields_under_root: true
 
 processors:
   - add_docker_metadata:
@@ -16,6 +35,19 @@ processors:
       fields: ['message']
       target: ''
       overwrite_keys: true
+  - add_host_metadata: ~
+  - add_cloud_metadata: ~
+  - add_process_metadata:
+      match_pids: ['process.pid']
+  - timestamp:
+      field: timestamp
+      target_field: '@timestamp'
+      layouts:
+        - '2006-01-02T15:04:05.999Z'
+      test:
+        - '2025-05-13T20:51:14.883Z'
+      ignore_missing: true
+      ignore_failure: true
 
 filebeat.config.modules:
   path: ${path.config}/modules.d/*.yml
@@ -23,6 +55,13 @@ filebeat.config.modules:
 
 output.logstash:
   hosts: ['logstash:5044']
+  bulk_max_size: 50
+  worker: 1
+  pipelining: 0
+  # Configurar timeout para mejor manejo de reconexiones
+  timeout: 30s
+  backoff.init: 1s
+  backoff.max: 60s
 
 logging.level: info
 logging.to_files: true
@@ -31,3 +70,8 @@ logging.files:
   name: filebeat
   keepfiles: 7
   permissions: 0644
+
+# Habilitar monitoreo de Filebeat desde Kibana
+monitoring.enabled: true
+monitoring.elasticsearch:
+  hosts: ['elasticsearch:9200']

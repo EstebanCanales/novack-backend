@@ -4,6 +4,7 @@ import * as net from 'net';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ElkConfig, getElkConfig } from './elk-config';
+import * as os from 'os';
 
 @Injectable()
 export class LogTransportService implements OnModuleInit {
@@ -15,9 +16,26 @@ export class LogTransportService implements OnModuleInit {
   private currentLogDate: string = '';
 
   constructor(private configService: ConfigService) {
-    this.elkConfig = getElkConfig(configService);
+    const environment = this.configService.get<string>('NODE_ENV', 'development');
+    
+    // Modificar el host de Logstash basado en el entorno
+    const logstashHost = environment === 'development' && !process.env.DOCKER_CONTAINER
+      ? 'localhost'
+      : this.configService.get<string>('LOGSTASH_HOST', 'logstash');
+    
+    this.elkConfig = {
+      enabled: this.configService.get<string>('ELK_ENABLED', 'false') === 'true',
+      elasticsearchHost: this.configService.get<string>('ELASTICSEARCH_HOST', 'http://elasticsearch:9200'),
+      logstashHost: logstashHost,
+      logstashPort: parseInt(this.configService.get<string>('LOGSTASH_PORT', '50000')),
+      applicationName: this.configService.get<string>('APP_NAME', 'novack-backend'),
+      environment: environment
+    };
+    
     this.logDir = path.join(process.cwd(), 'logs');
     this.fileTransport = configService.get<string>('LOG_TO_FILE', 'true') === 'true';
+    
+    console.log(`Configuración de LogTransport: logstashHost=${this.elkConfig.logstashHost}, logstashPort=${this.elkConfig.logstashPort}, enabled=${this.elkConfig.enabled}`);
   }
 
   async onModuleInit() {
@@ -38,13 +56,12 @@ export class LogTransportService implements OnModuleInit {
 
   private connectToLogstash() {
     try {
-      const [host, portStr] = this.elkConfig.elasticsearchHost.split(':');
-      const port = parseInt(portStr.replace(/\D/g, '')) || 50000;
+      const { logstashHost, logstashPort } = this.elkConfig;
       
       this.logstashClient = new net.Socket();
       
-      this.logstashClient.connect(port, host.replace(/^https?:\/\//, ''), () => {
-        console.log(`Conectado a Logstash en ${host}:${port}`);
+      this.logstashClient.connect(logstashPort, logstashHost, () => {
+        console.log(`Conectado a Logstash en ${logstashHost}:${logstashPort}`);
       });
 
       this.logstashClient.on('error', (err) => {

@@ -1,4 +1,4 @@
-import { Module, Global, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { Module, Global, NestModule, MiddlewareConsumer, Logger } from '@nestjs/common';
 import { StructuredLoggerService } from './structured-logger.service';
 import { CorrelationIdMiddleware } from './correlation-id.middleware';
 import { LogTransportService } from './log-transport.service';
@@ -9,11 +9,13 @@ import { ConfigModule } from '@nestjs/config';
   imports: [ConfigModule],
   providers: [
     LogTransportService,
-    StructuredLoggerService
+    StructuredLoggerService,
+    Logger,
   ],
   exports: [
     StructuredLoggerService,
-    LogTransportService
+    LogTransportService,
+    Logger
   ],
 })
 export class LoggingModule implements NestModule {

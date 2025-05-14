@@ -1,32 +1,24 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
-import { StructuredLoggerService } from './infrastructure/logging/structured-logger.service';
 import { v4 as uuidv4 } from 'uuid';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as session from 'express-session';
 import * as cookieParser from 'cookie-parser';
+import { StructuredLoggerService } from './infrastructure/logging/structured-logger.service';
 
 async function bootstrap() {
-  // Crear ID de correlación para el proceso de inicio
-  const startupCorrelationId = uuidv4();
-  StructuredLoggerService.setContext({ correlationId: startupCorrelationId });
+  // const startupCorrelationId = uuidv4();
   
-  // Crear la aplicación con logger estructurado
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });
+
+  const logger = await app.resolve(StructuredLoggerService);
   
-  // Obtener instancia del logger estructurado
-  const logger = app.get(StructuredLoggerService);
-  logger.setContext('NestApplication');
-  
-  // Configurar el logger como logger global
   app.useLogger(logger);
-  
-  // Liberar los logs almacenados en buffer
   app.flushLogs();
   
   const configService = app.get(ConfigService);
