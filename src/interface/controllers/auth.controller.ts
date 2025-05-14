@@ -8,9 +8,9 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from '../../application/services/auth.service';
-import { LoginDto } from '../../domain/dtos/auth/login.dto';
-import { RefreshTokenDto } from 'src/domain/dtos/auth/refresh-token.dto';
-import { LogoutDto } from 'src/domain/dtos/auth/logout.dto';
+import { LoginDto } from 'src/application/dtos/auth/login.dto';
+import { RefreshTokenDto } from 'src/application/dtos/auth/refresh-token.dto';
+import { LogoutDto } from 'src/application/dtos/auth/logout.dto';
 import { Public } from '../../application/decorators/public.decorator';
 
 @ApiTags('auth')
@@ -34,7 +34,7 @@ export class AuthController {
   async login(@Body() loginDto: LoginDto, @Request() req) {
     return await this.authService.login(loginDto.email, loginDto.password, req);
   }
-  
+
   @Public()
   @Post('refresh')
   @ApiOperation({ summary: 'Refrescar token de acceso' })
@@ -49,9 +49,12 @@ export class AuthController {
   })
   @HttpCode(200)
   async refreshToken(@Body() refreshTokenDto: RefreshTokenDto, @Request() req) {
-    return await this.authService.refreshToken(refreshTokenDto.refresh_token, req);
+    return await this.authService.refreshToken(
+      refreshTokenDto.refresh_token,
+      req,
+    );
   }
-  
+
   @Post('logout')
   @ApiOperation({ summary: 'Cerrar sesión' })
   @ApiResponse({
@@ -62,4 +65,4 @@ export class AuthController {
   async logout(@Body() logoutDto: LogoutDto) {
     return { success: await this.authService.logout(logoutDto.refresh_token) };
   }
-} 
+}

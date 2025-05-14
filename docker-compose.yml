@@ -1,4 +1,74 @@
 services:
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.4
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false 
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --fail localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    networks:
+      - elk_network
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.4
+    container_name: logstash
+    volumes:
+      - ./config/logstash/:/usr/share/logstash/pipeline/
+    ports:
+      - "5044:5044" 
+      - "50000:50000/tcp" 
+      - "50000:50000/udp" 
+    environment:
+      LS_JAVA_OPTS: "-Xms256m -Xmx256m"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy 
+    networks:
+      - elk_network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.4
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200 
+    depends_on:
+      elasticsearch:
+        condition: service_healthy 
+    networks:
+      - elk_network
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.4
+    container_name: filebeat
+    user: root 
+    volumes:
+      - ./config/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./logs:/var/log/app_logs:ro 
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro # Para logs de contenedores Docker
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Para metadatos de Docker
+    command: filebeat -e -strict.perms=false
+    depends_on: 
+      logstash:
+        condition: service_started 
+    networks:
+      - elk_network
+
   api:
     build:
       context: .
@@ -12,38 +82,47 @@ services:
       - DB_PORT=5430
       - DB_USERNAME=postgres
       - DB_PASSWORD=postgres
-      - DB_NAME=spcedes
+      - DB_NAME=novack
       - JWT_SECRET=UtahD6c3jgBkajP7eXmMu9E2FwGpRxQnSvCzKyV8ZfLtAqTs5bN4YdHr3WJ7mhk2
       - JWT_ACCESS_EXPIRATION=15m
       - JWT_REFRESH_EXPIRATION_DAYS=7
-      - JWT_AUDIENCE=https://api.spcedes.com
+      - JWT_AUDIENCE=https://api.novack.com
       - JWT_ISSUER=SPCEDES_API
-      - RESEND_API_KEY=${RESEND_API_KEY}
+      - RESEND_API_KEY=${RESEND_API_KEY} 
       - REDIS_HOST=redis-17374.c80.us-east-1-2.ec2.redns.redis-cloud.com
       - REDIS_PORT=17374
       - REDIS_USERNAME=default
       - REDIS_PASSWORD=vNrEVCdgtVb3A0Rr6Nb6H7JKKNxa4XYh
       - REDIS_TLS_ENABLED=true
       - REDIS_ENCRYPTION_KEY=${REDIS_ENCRYPTION_KEY:-secure_encryption_key_for_redis_data}
+      - LOGSTASH_HOST=logstash
+      - LOGSTASH_PORT=50000
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - ELK_ENABLED=true 
       - ESP32_AUTH_KEY=${ESP32_AUTH_KEY:-esp32_aQ9bP2cX8dZ7eW6fV5gT4hR3jS2kL1mN0}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      logstash: 
+        condition: service_started 
     networks:
-      - app-network
+      - app-network  
+      - elk_network  
 
   postgres:
     image: postgres:16-alpine
-    command: -p 5430
+    container_name: postgres # Añadir nombre de contenedor por consistencia
+    command: -p 5430 # El puerto interno que usará Postgres
     ports:
-      - '5430:5430'
+      - '5430:5430' # Mapea el puerto interno 5430 al puerto 5430 del host
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=spcedes
+      - POSTGRES_DB=novack
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -p 5430']
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d novack -p 5430'] 
       interval: 10s
       timeout: 5s
       retries: 5
@@ -52,7 +131,10 @@ services:
 
 volumes:
   postgres_data:
+  elasticsearch-data:
 
 networks:
+  elk_network:
+    driver: bridge
   app-network:
     driver: bridge

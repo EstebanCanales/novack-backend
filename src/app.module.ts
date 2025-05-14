@@ -32,6 +32,7 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
 import { DataMaskingInterceptor } from './application/interceptors/data-masking.interceptor';
 import { RedisTestController } from './interface/controllers/redis-test.controller';
 import { LoggingModule } from './infrastructure/logging/logging.module';
+import { LogstashModule } from './infrastructure/services/logstash.module';
 
 /**
  * Root module of the application that configures and organizes all feature modules.
@@ -126,6 +127,7 @@ import { LoggingModule } from './infrastructure/logging/logging.module';
       }),
     }),
     LoggingModule,
+    LogstashModule, // Nuevo módulo para gestionar conexión con Logstash
   ],
   controllers: [
     RedisTestController
