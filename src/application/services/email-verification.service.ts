@@ -1,126 +1,142 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable, BadRequestException, Inject } from '@nestjs/common';
+import { IEmployeeRepository } from '../../domain/repositories/employee.repository.interface';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
-import { Employee } from '../../domain/entities';
 import { EmailService } from './email.service';
 
 @Injectable()
 export class EmailVerificationService {
   constructor(
-    @InjectRepository(Employee)
-    private readonly employeeRepository: Repository<Employee>,
-    private readonly emailService: EmailService,
+    @Inject('IEmployeeRepository')
+    private readonly employeeRepository: IEmployeeRepository,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+    private readonly emailService: EmailService
   ) {}
 
-  async sendVerificationEmail(employeeId: string) {
-    console.log('Iniciando envío de email de verificación para empleado:', employeeId);
-
-    try {
-      const employee = await this.employeeRepository.findOne({
-        where: { id: employeeId },
-      });
-
-      console.log('Empleado encontrado:', employee);
-
-      if (!employee) {
-        throw new NotFoundException('Empleado no encontrado');
-      }
-
-      if (employee.is_email_verified) {
-        throw new BadRequestException('El correo ya está verificado');
-      }
-
-      // Generar token y establecer expiración
-      const verificationToken = uuidv4();
-      const expirationDate = new Date();
-      expirationDate.setHours(expirationDate.getHours() + 24); // Expira en 24 horas
-
-      console.log('Token generado:', {
-        verificationToken,
-        expirationDate,
-      });
-
-      // Guardar token y fecha de expiración
-      employee.email_verification_token = verificationToken;
-      employee.email_verification_expires = expirationDate;
-      await this.employeeRepository.save(employee);
-
-      console.log('Token guardado en la base de datos');
-
-      // Enviar email de verificación
-      await this.emailService.sendEmailVerification(
-        employee.email,
-        employee.name,
-        verificationToken,
-      );
-
-      console.log('Email de verificación enviado exitosamente');
-
-      return {
-        message: 'Email de verificación enviado exitosamente',
-      };
-    } catch (error) {
-      console.error('Error al enviar email de verificación:', error);
-      throw error;
+  /**
+   * Genera un token de verificación de email
+   */
+  async generateVerificationToken(employeeId: string): Promise<string> {
+    const employee = await this.employeeRepository.findById(employeeId);
+    
+    if (!employee) {
+      throw new BadRequestException('Empleado no encontrado');
     }
+
+    if (employee.credentials?.is_email_verified) {
+      throw new BadRequestException('El email ya está verificado');
+    }
+
+    // Generar token único
+    const verificationToken = uuidv4();
+    
+    // Establecer fecha de expiración (24 horas)
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+    
+    // Guardar el token en las credenciales
+    await this.employeeRepository.updateCredentials(employeeId, {
+      verification_token: verificationToken,
+      reset_token_expires: expiresAt
+    });
+    
+    return verificationToken;
   }
 
-  async verifyEmail(token: string) {
-    const employee = await this.employeeRepository.findOne({
-      where: { email_verification_token: token },
-    });
-
+  /**
+   * Envía un email de verificación al empleado
+   */
+  async sendVerificationEmail(employeeId: string): Promise<boolean> {
+    const employee = await this.employeeRepository.findById(employeeId);
+    
     if (!employee) {
-      throw new BadRequestException('Token de verificación inválido');
+      throw new BadRequestException('Empleado no encontrado');
     }
 
-    if (employee.is_email_verified) {
-      throw new BadRequestException('El correo ya está verificado');
+    if (employee.credentials?.is_email_verified) {
+      throw new BadRequestException('El email ya está verificado');
     }
-
-    if (!employee.email_verification_expires || new Date() > employee.email_verification_expires) {
-      throw new BadRequestException('El token de verificación ha expirado');
-    }
-
-    // Marcar como verificado y limpiar campos de verificación
-    employee.is_email_verified = true;
-    employee.email_verification_token = null;
-    employee.email_verification_expires = null;
-    await this.employeeRepository.save(employee);
-
-    // Enviar email de confirmación
-    await this.emailService.sendEmailVerificationSuccess(
+    
+    // Generar token
+    const verificationToken = await this.generateVerificationToken(employeeId);
+    
+    // Construir URL de verificación
+    const baseUrl = this.configService.get('FRONTEND_URL', 'http://localhost:3000');
+    const verificationUrl = `${baseUrl}/verify-email/${verificationToken}`;
+    
+    // Enviar email
+    await this.emailService.sendEmailVerification(
       employee.email,
-      employee.name,
+      `${employee.first_name} ${employee.last_name}`,
+      verificationUrl
     );
+    
+    return true;
+  }
+  
+  /**
+   * Reenvía un email de verificación al empleado
+   */
+  async resendVerificationEmail(employeeId: string): Promise<boolean> {
+    const employee = await this.employeeRepository.findById(employeeId);
+    
+    if (!employee) {
+      throw new BadRequestException('Empleado no encontrado');
+    }
 
-    return {
-      message: 'Correo electrónico verificado exitosamente',
-    };
+    if (employee.credentials?.is_email_verified) {
+      throw new BadRequestException('El email ya está verificado');
+    }
+    
+    // Limpiar token anterior si existe
+    if (employee.credentials?.verification_token) {
+      await this.employeeRepository.updateCredentials(employeeId, {
+        verification_token: null,
+        reset_token_expires: null
+      });
+    }
+    
+    // Generar nuevo token y enviar email
+    return this.sendVerificationEmail(employeeId);
   }
 
-  async resendVerificationEmail(employeeId: string) {
-    const employee = await this.employeeRepository.findOne({
-      where: { id: employeeId },
+  /**
+   * Verifica un token de verificación de email
+   */
+  async verifyEmail(token: string): Promise<boolean> {
+    const employee = await this.employeeRepository.findByVerificationToken(token);
+    
+    if (!employee || !employee.credentials) {
+      throw new BadRequestException('Token inválido o expirado');
+    }
+    
+    const now = new Date();
+    if (employee.credentials.reset_token_expires && employee.credentials.reset_token_expires < now) {
+      throw new BadRequestException('El token ha expirado');
+    }
+    
+    // Actualizar estado de verificación
+    await this.employeeRepository.updateCredentials(employee.id, {
+      is_email_verified: true,
+      verification_token: null,
+      reset_token_expires: null
     });
+    
+    return true;
+  }
 
+  /**
+   * Comprueba si un email está verificado
+   */
+  async isEmailVerified(employeeId: string): Promise<boolean> {
+    const employee = await this.employeeRepository.findById(employeeId);
+    
     if (!employee) {
-      throw new NotFoundException('Empleado no encontrado');
+      throw new BadRequestException('Empleado no encontrado');
     }
-
-    if (employee.is_email_verified) {
-      throw new BadRequestException('El correo ya está verificado');
-    }
-
-    // Verificar si ha pasado al menos 5 minutos desde el último envío
-    if (
-      employee.email_verification_expires &&
-      new Date(employee.email_verification_expires).getTime() - 24 * 60 * 60 * 1000 + 5 * 60 * 1000 > new Date().getTime()
-    ) {
-      throw new BadRequestException('Debes esperar 5 minutos antes de solicitar un nuevo código');
-    }
-
-    return this.sendVerificationEmail(employeeId);
+    
+    return !!employee.credentials?.is_email_verified;
   }
 } 

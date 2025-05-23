@@ -17,7 +17,8 @@ import { Visitor } from './visitor.entity';
 export enum ChatRoomType {
   SUPPLIER_GROUP = 'supplier_group',  // Grupo general del proveedor
   EMPLOYEE_TO_EMPLOYEE = 'employee_to_employee',  // Chat privado entre empleados
-  EMPLOYEE_TO_VISITOR = 'employee_to_visitor'  // Chat entre empleado y visitante
+  EMPLOYEE_TO_VISITOR = 'employee_to_visitor',  // Chat entre empleado y visitante
+  PRIVATE = 'private'  // Chat privado (general)
 }
 
 @Entity({ name: 'chat_rooms' })

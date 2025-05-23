@@ -37,6 +37,12 @@ services:
     depends_on:
       elasticsearch:
         condition: service_healthy 
+    healthcheck:
+      test: ["CMD", "curl", "--silent", "--fail", "localhost:9600/?pretty"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     networks:
       - elk_network
 
@@ -99,12 +105,12 @@ services:
       - LOGSTASH_PORT=50000
       - ELASTICSEARCH_HOST=http://elasticsearch:9200
       - ELK_ENABLED=true 
-      - ESP32_AUTH_KEY=${ESP32_AUTH_KEY:-esp32_aQ9bP2cX8dZ7eW6fV5gT4hR3jS2kL1mN0}
+      - DOCKER_CONTAINER=true
     depends_on:
       postgres:
         condition: service_healthy
       logstash: 
-        condition: service_started 
+        condition: service_healthy
     networks:
       - app-network  
       - elk_network  

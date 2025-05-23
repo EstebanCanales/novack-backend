@@ -1,43 +1,32 @@
-FROM node:20.10.0-alpine3.18 as builder
+FROM node:20.10.0-alpine3.18
 
 WORKDIR /usr/src/app
 
 # Install dependencies for bcrypt and other native modules
 RUN apk add --no-cache python3 make g++ gcc git
 
+# Copy package files
 COPY package*.json ./
 COPY pnpm-lock.yaml ./
 
 # Install pnpm
 RUN npm install -g pnpm
 
-# Install dependencies
+# Install all dependencies
 RUN pnpm install
+
+# Explicitly install typeorm and rebuild bcrypt
+RUN pnpm add typeorm@0.3.24 pg 
+RUN cd node_modules/bcrypt && npm rebuild bcrypt --build-from-source
 
 # Copy source code
 COPY . .
 
-# Build the application
-RUN pnpm run build
+# Create logs directory
+RUN mkdir -p /usr/src/app/logs
+RUN chmod 777 /usr/src/app/logs
 
-# Final stage
-FROM node:20.10.0-alpine3.18
-
-WORKDIR /usr/src/app
-
-# Install dependencies for bcrypt
-RUN apk add --no-cache python3 make g++ gcc
-
-COPY --from=builder /usr/src/app/dist ./dist
-COPY package*.json ./
-COPY pnpm-lock.yaml ./
-
-# Install only production dependencies and rebuild bcrypt specifically
-RUN npm install -g pnpm
-RUN pnpm install --prod
-RUN cd node_modules/bcrypt && npm rebuild bcrypt --build-from-source
-
-# Expose the port the app runs on
+# Expose the port
 EXPOSE 4000
 
 # Start the application

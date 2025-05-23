@@ -8,14 +8,15 @@ import { ChatController } from '../../interface/controllers/chat.controller';
 import { ChatGateway } from '../../infrastructure/websockets/chat.gateway';
 import { WsJwtGuard } from '../guards/ws-jwt.guard';
 import { RedisDatabaseModule } from '../../infrastructure/database/redis/redis.database.module';
-import { TokenService } from '../services/token.service';
 import { AuthModule } from './auth.module';
+import { TokenModule } from './token.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ChatRoom, ChatMessage, Employee, Visitor, Supplier]),
     RedisDatabaseModule,
     AuthModule,
+    TokenModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

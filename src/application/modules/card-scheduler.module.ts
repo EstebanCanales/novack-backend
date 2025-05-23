@@ -6,10 +6,12 @@ import { Card, CardLocation, Visitor, Appointment } from 'src/domain/entities';
 import { CardSchedulerService } from '../services/card-scheduler.service';
 import { CardModule } from './card.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TokenModule } from './token.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Card, CardLocation, Visitor, Appointment]),
+    TokenModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

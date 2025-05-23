@@ -3,14 +3,24 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateEmployeeDto {
     @ApiProperty({ 
-        description: 'Nombre completo del empleado',
-        example: 'Juan Pérez García',
-        minLength: 3,
-        maxLength: 100
+        description: 'Nombre del empleado',
+        example: 'Juan',
+        minLength: 2,
+        maxLength: 50
     })
     @IsString()
     @IsNotEmpty({ message: 'El nombre es requerido' })
-    name: string;
+    first_name: string;
+
+    @ApiProperty({ 
+        description: 'Apellidos del empleado',
+        example: 'Pérez García',
+        minLength: 2,
+        maxLength: 50
+    })
+    @IsString()
+    @IsNotEmpty({ message: 'Los apellidos son requeridos' })
+    last_name: string;
 
     @ApiProperty({ 
         description: 'Correo electrónico del empleado (único)',

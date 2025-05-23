@@ -61,7 +61,8 @@ export class SupplierService {
       const temporalPassword = 'Temporal123';
       try {
         const employee = await this.employeeService.create({
-          name: createSupplierDto.supplier_creator,
+          first_name: createSupplierDto.supplier_creator.split(' ')[0] || 'Admin',
+          last_name: createSupplierDto.supplier_creator.split(' ').slice(1).join(' ') || 'User',
           email: createSupplierDto.contact_email,
           password: temporalPassword,
           is_creator: true,

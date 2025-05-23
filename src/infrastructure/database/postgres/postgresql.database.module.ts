@@ -2,19 +2,28 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { 
+  Employee,
   Supplier, 
-  SupplierSubscription, 
-  Employee, 
-  EmployeeAuth, 
+  Card,
   Visitor, 
-  Appointment, 
-  Card, 
-  CardLocation, 
-  Sensor, 
-  SensorReading 
+  ChatRoom,
+  ChatMessage,
+  AuditLog,
 } from '../../../domain/entities';
+import { EmployeeCredentials } from '../../../domain/entities/employee-credentials.entity';
 import { PostgresqlDatabaseService } from './postgresql.database.service';
 import { PostgresqlDatabaseController } from './postgresql.database.controller';
+
+const entities = [
+  Employee,
+  EmployeeCredentials,
+  Supplier,
+  Card,
+  Visitor,
+  ChatRoom,
+  ChatMessage,
+  AuditLog,
+];
 
 @Module({
   imports: [
@@ -28,18 +37,7 @@ import { PostgresqlDatabaseController } from './postgresql.database.controller';
         username: configService.get('DB_USERNAME', 'postgres'),
         password: configService.get('DB_PASSWORD', 'postgres'),
         database: configService.get('DB_NAME', 'postgres'),
-        entities: [
-          Supplier, 
-          SupplierSubscription, 
-          Employee, 
-          EmployeeAuth, 
-          Visitor, 
-          Appointment, 
-          Card, 
-          CardLocation, 
-          Sensor, 
-          SensorReading
-        ],
+        entities: entities,
         synchronize: configService.get('NODE_ENV') !== 'production',
         logging: configService.get('NODE_ENV') === 'development',
       }),

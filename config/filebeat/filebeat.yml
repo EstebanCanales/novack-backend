@@ -7,8 +7,6 @@ filebeat.inputs:
       - ${path.config}/../../logs/*.log # Ruta relativa para desarrollo
     harvester_limit: 5
     scan_frequency: 10s
-    backoff: '1s'
-    max_backoff: '10s'
     fields:
       app: 'novack-backend'
       environment: 'development'
@@ -21,8 +19,6 @@ filebeat.inputs:
     paths:
       - '/var/lib/docker/containers/*/*.log'
     harvester_limit: 5
-    backoff: '1s'
-    max_backoff: '10s'
     fields:
       source: 'docker'
       environment: 'development'

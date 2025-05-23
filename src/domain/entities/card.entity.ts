@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { Supplier } from './supplier.entity';
 import { Visitor } from './visitor.entity';
+import { Employee } from './employee.entity';
 
 @Entity({ name: 'cards' })
 export class Card {
@@ -47,14 +48,23 @@ export class Card {
   @UpdateDateColumn()
   updated_at: Date;
 
-  @ManyToOne(() => Supplier, (supplier) => supplier.cards)
+  @ManyToOne(() => Supplier, supplier => supplier.cards)
   supplier: Supplier;
 
-  @OneToOne(() => Visitor, (visitor) => visitor.card)
+  @Column()
+  supplier_id: string;
+
+  @ManyToOne(() => Employee, employee => employee.cards)
+  assigned_to: Employee;
+
+  @Column({ nullable: true })
+  assigned_to_id: string;
+
+  @OneToOne(() => Visitor, visitor => visitor.card)
   @JoinColumn()
   visitor: Visitor;
 
-  @OneToMany(() => CardLocation, (location) => location.card)
+  @OneToMany(() => CardLocation, location => location.card)
   locations: CardLocation[];
 }
 
@@ -78,6 +88,9 @@ export class CardLocation {
   @CreateDateColumn()
   created_at: Date;
 
-  @ManyToOne(() => Card, (card) => card.locations)
+  @ManyToOne(() => Card, card => card.locations)
   card: Card;
+
+  @Column()
+  card_id: string;
 }

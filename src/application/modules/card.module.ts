@@ -8,12 +8,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CardSchedulerModule } from './card-scheduler.module';
 import { RedisDatabaseModule } from '../../infrastructure/database/redis/redis.database.module';
 import { AuthModule } from './auth.module';
+import { TokenModule } from './token.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Card, CardLocation, Supplier, Visitor]),
     RedisDatabaseModule,
     forwardRef(() => AuthModule),
+    TokenModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

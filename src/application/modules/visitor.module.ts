@@ -5,19 +5,21 @@ import { VisitorController } from '../../interface/controllers/visitor.controlle
 import { Visitor, Supplier, Appointment } from 'src/domain/entities';
 import { EmailService } from '../services/email.service';
 import { CardModule } from './card.module';
-import { FileStorageService } from '../services/file-storage.service';
+import { FileStorageModule } from './file-storage.module';
 import { ImageProcessingPipe } from '../pipes/image-processing.pipe';
+import { TokenModule } from './token.module';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([Visitor, Supplier, Appointment]),
         CardModule,
+        TokenModule,
+        FileStorageModule,
     ],
     controllers: [VisitorController],
     providers: [
         VisitorService,
         EmailService,
-        FileStorageService,
         ImageProcessingPipe,
     ],
     exports: [VisitorService],
