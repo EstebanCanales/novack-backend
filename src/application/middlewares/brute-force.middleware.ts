@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MoreThanOrEqual } from 'typeorm';
-import { LoginAttempt } from 'src/domain/entities';
+import { LoginAttempt } from 'src/domain/entities/login-attempt.entity';
 
 /**
  * Middleware que protege contra ataques de fuerza bruta

@@ -3,14 +3,24 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateEmployeeDto {
     @ApiPropertyOptional({ 
-        description: 'Nombre completo del empleado',
-        example: 'Juan Pérez García',
-        minLength: 3,
-        maxLength: 100
+        description: 'Nombre del empleado',
+        example: 'Juan',
+        minLength: 2,
+        maxLength: 50
     })
     @IsString()
     @IsOptional()
-    name?: string;
+    first_name?: string;
+
+    @ApiPropertyOptional({ 
+        description: 'Apellidos del empleado',
+        example: 'Pérez García',
+        minLength: 2,
+        maxLength: 50
+    })
+    @IsString()
+    @IsOptional()
+    last_name?: string;
 
     @ApiPropertyOptional({ 
         description: 'Correo electrónico del empleado (único)',

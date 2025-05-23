@@ -5,19 +5,21 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { Supplier, SupplierSubscription } from "src/domain/entities";
 import { EmailService } from "../services/email.service";
 import { EmployeeModule } from "./employee.module";
-import { FileStorageService } from '../services/file-storage.service';
+import { FileStorageModule } from './file-storage.module';
 import { ImageProcessingPipe } from '../pipes/image-processing.pipe';
+import { TokenModule } from "./token.module";
 
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([Supplier, SupplierSubscription]),
 		EmployeeModule,
+		TokenModule,
+		FileStorageModule,
 	],
 	controllers: [SupplierController],
 	providers: [
 		SupplierService,
 		EmailService,
-		FileStorageService,
 		ImageProcessingPipe,
 	],
 	exports: [SupplierService]

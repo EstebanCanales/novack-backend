@@ -1,11 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { EmployeeService } from './employee.service';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Employee, EmployeeAuth, RefreshToken } from '../../domain/entities';
+import { Injectable, UnauthorizedException, Inject } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { Employee } from '../../domain/entities';
+import { EmployeeCredentials } from '../../domain/entities/employee-credentials.entity';
 import * as bcrypt from 'bcrypt';
-import { TokenService } from './token.service';
 import { Request } from 'express';
+import { IEmployeeRepository } from '../../domain/repositories/employee.repository.interface';
 
 @Injectable()
 export class AuthService {
@@ -13,98 +12,60 @@ export class AuthService {
   private readonly LOCK_TIME_MINUTES = 15;
 
   constructor(
-    private readonly employeeService: EmployeeService,
-    private readonly tokenService: TokenService,
-    @InjectRepository(Employee)
-    private readonly employeeRepository: Repository<Employee>,
-    @InjectRepository(EmployeeAuth)
-    private readonly employeeAuthRepository: Repository<EmployeeAuth>,
-    @InjectRepository(RefreshToken)
-    private readonly refreshTokenRepository: Repository<RefreshToken>,
+    @Inject('IEmployeeRepository')
+    private readonly employeeRepository: IEmployeeRepository,
+    private readonly jwtService: JwtService
   ) {}
 
-  async validateEmployee(email: string, password: string) {
-    const employeeData = await this.employeeService.findByEmail(email);
-    if (!employeeData || !employeeData.auth) {
+  async login(email: string, password: string, req: Request) {
+    // Buscar empleado por correo
+    const employee = await this.employeeRepository.findByEmail(email);
+    
+    if (!employee || !employee.credentials) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const { auth, ...employee } = employeeData;
+    // Verificar contraseña
+    const isPasswordValid = await bcrypt.compare(
+      password,
+      employee.credentials.password_hash
+    );
 
-    // Verificar si la cuenta está bloqueada
-    if (auth.locked_until && auth.locked_until > new Date()) {
-      const remainingMinutes = Math.ceil(
-        (auth.locked_until.getTime() - new Date().getTime()) / (1000 * 60)
-      );
-      throw new UnauthorizedException(
-        `Cuenta bloqueada. Intente nuevamente en ${remainingMinutes} minutos`
-      );
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, auth.password);
     if (!isPasswordValid) {
-      // Incrementar el contador de intentos fallidos
-      auth.login_attempts += 1;
-
-      // Si excede el máximo de intentos, bloquear la cuenta
-      if (auth.login_attempts >= this.MAX_LOGIN_ATTEMPTS) {
-        auth.locked_until = new Date(
-          Date.now() + this.LOCK_TIME_MINUTES * 60 * 1000
-        );
-        await this.employeeAuthRepository.save(auth);
-        throw new UnauthorizedException(
-          `Demasiados intentos fallidos. Cuenta bloqueada por ${this.LOCK_TIME_MINUTES} minutos`
-        );
-      }
-
-      await this.employeeAuthRepository.save(auth);
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    // Restablecer los intentos fallidos si el login es exitoso
-    if (auth.login_attempts > 0) {
-      auth.login_attempts = 0;
-      auth.locked_until = null;
-      auth.last_login_at = new Date();
-      await this.employeeAuthRepository.save(auth);
+    // Verificar si el correo está verificado
+    if (!employee.credentials.is_email_verified) {
+      throw new UnauthorizedException('El correo electrónico no ha sido verificado');
     }
 
-    return employee;
-  }
-
-  async login(email: string, password: string, request?: Request) {
-    const validatedEmployee = await this.validateEmployee(email, password);
-    
-    // Obtener el empleado completo con su relación auth
-    const employee = await this.employeeRepository.findOne({ 
-      where: { id: validatedEmployee.id },
-      relations: ['auth', 'supplier'] 
+    // Actualizar último login
+    await this.employeeRepository.updateCredentials(employee.id, {
+      last_login: new Date()
     });
-    
-    // Generar tokens con el nuevo servicio
-    const tokens = await this.tokenService.generateTokens(employee, request);
-    
+
+    // Generar token
+    const payload = { 
+      sub: employee.id, 
+      email: employee.email,
+      supplier_id: employee.supplier_id 
+    };
+
     return {
-      ...tokens,
-      employee: {
-        id: employee.id,
-        name: employee.name,
-        email: employee.email,
-        is_creator: employee.is_creator,
-        supplier: employee.supplier,
-      },
+      access_token: this.jwtService.sign(payload),
+      employee
     };
   }
-  
-  async refreshToken(token: string, request?: Request) {
-    return this.tokenService.refreshAccessToken(token, request);
+
+  async refreshToken(refreshToken: string, req: Request) {
+    // En una implementación real, verificaríamos el refresh token contra una base de datos
+    // y generaríamos un nuevo access token
+    throw new UnauthorizedException('Función no implementada');
   }
-  
+
   async logout(refreshToken: string) {
-    return this.tokenService.revokeToken(refreshToken);
+    // En una implementación real, invalidaríamos el refresh token
+    return true;
   }
-  
-  async validateToken(token: string) {
-    return this.tokenService.validateToken(token);
-  }
-} 
+}

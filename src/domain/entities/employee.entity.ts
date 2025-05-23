@@ -7,9 +7,14 @@ import {
   UpdateDateColumn,
   OneToOne,
   JoinColumn,
+  OneToMany,
+  ManyToMany,
+  JoinTable
 } from 'typeorm';
 import { Supplier } from './supplier.entity';
-import { EmployeeAuth } from './employee-auth.entity';
+import { Card } from './card.entity';
+import { ChatRoom } from './chat-room.entity';
+import { EmployeeCredentials } from './employee-credentials.entity';
 
 @Entity({ name: 'employees' })
 export class Employee {
@@ -17,19 +22,22 @@ export class Employee {
   id: string;
 
   @Column()
-  name: string;
+  first_name: string;
+
+  @Column()
+  last_name: string;
 
   @Column({ unique: true })
   email: string;
 
   @Column({ nullable: true })
-  phone: string;
+  phone?: string;
 
   @Column({ nullable: true })
-  position: string;
+  position?: string;
 
   @Column({ nullable: true })
-  department: string;
+  department?: string;
 
   @Column({ nullable: true })
   profile_image_url?: string;
@@ -37,43 +45,29 @@ export class Employee {
   @Column({ default: false })
   is_creator: boolean;
 
-  @Column({ default: false })
-  is_2fa_enabled: boolean;
-
-  @Column({ nullable: true })
-  two_factor_secret?: string;
-
-  @Column({ nullable: true })
-  two_factor_method?: string;
-
-  @Column({ nullable: true })
-  two_factor_recovery_codes?: string;
-
-  @Column({ default: false })
-  is_email_verified: boolean;
-
-  @Column({ nullable: true })
-  email_verification_token?: string;
-
-  @Column({ nullable: true })
-  email_verification_expires?: Date;
-
-  @Column({ default: 0 })
-  login_attempts: number;
-
-  @Column({ nullable: true })
-  locked_until?: Date;
-
-  @CreateDateColumn()
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
-  @UpdateDateColumn()
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   updated_at: Date;
 
-  @ManyToOne(() => Supplier, (supplier) => supplier.employees)
+  @ManyToOne(() => Supplier, supplier => supplier.employees)
   supplier: Supplier;
 
-  @OneToOne(() => EmployeeAuth, auth => auth.employee)
-  @JoinColumn({ name: 'id', referencedColumnName: 'employee_id' })
-  auth: EmployeeAuth;
+  @Column()
+  supplier_id: string;
+
+  @OneToMany(() => Card, card => card.assigned_to)
+  cards: Card[];
+
+  @ManyToMany(() => ChatRoom)
+  @JoinTable({
+    name: 'chat_room_employees',
+    joinColumn: { name: 'employee_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'chat_room_id', referencedColumnName: 'id' }
+  })
+  chat_rooms: ChatRoom[];
+
+  @OneToOne(() => EmployeeCredentials, credentials => credentials.employee)
+  credentials: EmployeeCredentials;
 }

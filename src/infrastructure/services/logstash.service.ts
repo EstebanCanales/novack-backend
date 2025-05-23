@@ -46,6 +46,9 @@ export class LogstashService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     if (this.config.enabled) {
+      // Añadir un retraso inicial de 5 segundos para permitir que Logstash esté completamente disponible
+      this.logger.log('Esperando 5 segundos antes de conectar a Logstash...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
       this.connect();
     } else {
       this.logger.log('Logstash está desactivado en la configuración');

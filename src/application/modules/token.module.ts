@@ -1,15 +1,14 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
-import { ESP32Controller } from '../../interface/controllers/esp32.controller';
-import { CardSchedulerModule } from './card-scheduler.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Supplier } from '../../domain/entities';
+import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TokenService } from '../services/token.service';
+import { RefreshToken } from '../../domain/entities/refresh-token.entity';
+import { Employee } from '../../domain/entities';
 
 @Module({
   imports: [
-    CardSchedulerModule,
-    TypeOrmModule.forFeature([Supplier]),
+    TypeOrmModule.forFeature([RefreshToken, Employee]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -19,6 +18,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       }),
     }),
   ],
-  controllers: [ESP32Controller],
+  providers: [TokenService],
+  exports: [TokenService, JwtModule],
 })
-export class ESP32Module {} 
+export class TokenModule {} 

@@ -1,9 +1,9 @@
 node_modules
 npm-debug.log
-dist
 .git
 .gitignore
 .env
+coverage
 .env.*
 README.md
 .dockerignore

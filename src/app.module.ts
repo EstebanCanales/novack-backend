@@ -22,7 +22,6 @@ import { EmailVerificationModule } from './application/modules/email-verificatio
 import { RedisDatabaseModule } from './infrastructure/database/redis/redis.database.module';
 import { CardSchedulerModule } from './application/modules/card-scheduler.module';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ESP32Module } from './application/modules/esp32.module';
 import { DatabaseResetModule } from './application/modules/database-reset.module';
 import { ChatModule } from './application/modules/chat.module';
 import { CsrfModule } from './application/modules/csrf.module';
@@ -33,6 +32,7 @@ import { DataMaskingInterceptor } from './application/interceptors/data-masking.
 import { RedisTestController } from './interface/controllers/redis-test.controller';
 import { LoggingModule } from './infrastructure/logging/logging.module';
 import { LogstashModule } from './infrastructure/services/logstash.module';
+import { TokenModule } from './application/modules/token.module';
 
 /**
  * Root module of the application that configures and organizes all feature modules.
@@ -91,7 +91,6 @@ import { LogstashModule } from './infrastructure/services/logstash.module';
     SupplierModule, // Supplier management
     SensorModule, // IoT sensor data handling
     CardSchedulerModule, // Automated card assignment and tracking
-    ESP32Module, // ESP32 devices communication
     // CompanyModule,
     // ServiceModule,
 
@@ -102,6 +101,7 @@ import { LogstashModule } from './infrastructure/services/logstash.module';
     TwoFactorAuthModule, // Two-factor authentication
     CsrfModule, // CSRF protection
     AuditModule, // Auditoría de accesos
+    TokenModule, // Token management
 
     // Communication modules
     EmailModule, // Email service integration

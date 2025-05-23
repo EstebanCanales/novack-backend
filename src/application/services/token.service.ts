@@ -2,7 +2,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Employee, RefreshToken } from '../../domain/entities';
+import { Employee } from '../../domain/entities';
+import { RefreshToken } from 'src/domain/entities/refresh-token.entity';
 import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
 import { Request } from 'express';
@@ -30,7 +31,7 @@ export class TokenService {
     const jwtPayload = {
       sub: employee.id,
       email: employee.email,
-      name: employee.name,
+      name: `${employee.first_name} ${employee.last_name}`,
       supplier_id: employee.supplier?.id,
       is_creator: employee.is_creator,
       jti: uuidv4(), // JWT ID único para facilitar revocación

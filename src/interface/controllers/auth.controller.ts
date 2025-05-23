@@ -1,68 +1,45 @@
-import {
-  Controller,
-  Post,
-  Body,
-  UnauthorizedException,
-  HttpCode,
-  Request,
-} from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AuthService } from '../../application/services/auth.service';
-import { LoginDto } from 'src/application/dtos/auth/login.dto';
-import { RefreshTokenDto } from 'src/application/dtos/auth/refresh-token.dto';
-import { LogoutDto } from 'src/application/dtos/auth/logout.dto';
+import { Controller, Post, Body, UnauthorizedException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { AuthenticateEmployeeUseCase, AuthenticateEmployeeDto } from '../../application/use-cases/auth/authenticate-employee.use-case';
 import { Public } from '../../application/decorators/public.decorator';
 
-@ApiTags('auth')
+@ApiTags('Autenticación')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authenticateEmployeeUseCase: AuthenticateEmployeeUseCase
+  ) {}
 
-  @Public()
   @Post('login')
-  @ApiOperation({ summary: 'Iniciar sesión' })
-  @ApiResponse({
-    status: 200,
-    description: 'Inicio de sesión exitoso',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Credenciales inválidas',
-    type: UnauthorizedException,
-  })
-  @HttpCode(200)
-  async login(@Body() loginDto: LoginDto, @Request() req) {
-    return await this.authService.login(loginDto.email, loginDto.password, req);
-  }
-
   @Public()
-  @Post('refresh')
-  @ApiOperation({ summary: 'Refrescar token de acceso' })
-  @ApiResponse({
-    status: 200,
-    description: 'Token refrescado exitosamente',
+  @ApiOperation({ summary: 'Autenticar empleado' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Empleado autenticado correctamente',
+    schema: {
+      properties: {
+        access_token: { type: 'string' },
+        employee: { 
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            email: { type: 'string' },
+            first_name: { type: 'string' },
+            last_name: { type: 'string' }
+          }
+        }
+      }
+    }
   })
-  @ApiResponse({
-    status: 401,
-    description: 'Token de refresco inválido o expirado',
-    type: UnauthorizedException,
-  })
-  @HttpCode(200)
-  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto, @Request() req) {
-    return await this.authService.refreshToken(
-      refreshTokenDto.refresh_token,
-      req,
-    );
-  }
-
-  @Post('logout')
-  @ApiOperation({ summary: 'Cerrar sesión' })
-  @ApiResponse({
-    status: 200,
-    description: 'Sesión cerrada exitosamente',
-  })
-  @HttpCode(200)
-  async logout(@Body() logoutDto: LogoutDto) {
-    return { success: await this.authService.logout(logoutDto.refresh_token) };
+  @ApiResponse({ status: 401, description: 'Credenciales inválidas' })
+  async login(@Body() credentials: AuthenticateEmployeeDto) {
+    try {
+      return await this.authenticateEmployeeUseCase.execute(credentials);
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Error al procesar la autenticación');
+    }
   }
 }
