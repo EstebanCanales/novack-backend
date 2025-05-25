@@ -1,41 +1,68 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as net from 'net';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ElkConfig, getElkConfig } from './elk-config';
-import * as os from 'os';
+import { ElkConfig } from './elk-config';
 
 @Injectable()
-export class LogTransportService implements OnModuleInit {
+export class LogTransportService implements OnModuleInit, OnModuleDestroy {
   private logstashClient: net.Socket | null = null;
   private fileTransport = false;
   private elkConfig: ElkConfig;
   private logDir: string;
   private currentLogStream: fs.WriteStream | null = null;
   private currentLogDate: string = '';
+  private isConnecting = false;
+  private connectionAttempts = 0;
+  private maxConnectionAttempts = 10;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private logQueue: any[] = [];
+  private maxQueueSize = 1000;
+  private failSafe: boolean;
+  private fallbackToConsole: boolean;
 
   constructor(private configService: ConfigService) {
-    const environment = this.configService.get<string>('NODE_ENV', 'development');
-    
+    const environment = this.configService.get<string>(
+      'NODE_ENV',
+      'development',
+    );
+
     // Modificar el host de Logstash basado en el entorno
-    const logstashHost = environment === 'development' && !process.env.DOCKER_CONTAINER
-      ? 'localhost'
-      : this.configService.get<string>('LOGSTASH_HOST', 'logstash');
-    
+    const logstashHost =
+      environment === 'development' && !process.env.DOCKER_CONTAINER
+        ? 'localhost'
+        : this.configService.get<string>('LOGSTASH_HOST', 'logstash');
+
     this.elkConfig = {
-      enabled: this.configService.get<string>('ELK_ENABLED', 'false') === 'true',
-      elasticsearchHost: this.configService.get<string>('ELASTICSEARCH_HOST', 'http://elasticsearch:9200'),
+      enabled:
+        this.configService.get<string>('ELK_ENABLED', 'false') === 'true',
+      elasticsearchHost: this.configService.get<string>(
+        'ELASTICSEARCH_HOST',
+        'http://elasticsearch:9200',
+      ),
       logstashHost: logstashHost,
-      logstashPort: parseInt(this.configService.get<string>('LOGSTASH_PORT', '50000')),
-      applicationName: this.configService.get<string>('APP_NAME', 'novack-backend'),
-      environment: environment
+      logstashPort: parseInt(
+        this.configService.get<string>('LOGSTASH_PORT', '50000'),
+      ),
+      applicationName: this.configService.get<string>(
+        'APP_NAME',
+        'novack-backend',
+      ),
+      environment: environment,
     };
-    
+
     this.logDir = path.join(process.cwd(), 'logs');
-    this.fileTransport = configService.get<string>('LOG_TO_FILE', 'true') === 'true';
-    
-    console.log(`Configuración de LogTransport: logstashHost=${this.elkConfig.logstashHost}, logstashPort=${this.elkConfig.logstashPort}, enabled=${this.elkConfig.enabled}`);
+    this.fileTransport =
+      configService.get<string>('LOG_TO_FILE', 'true') === 'true';
+    this.failSafe =
+      configService.get<string>('ELK_FAIL_SAFE', 'true') === 'true';
+    this.fallbackToConsole =
+      configService.get<string>('LOG_FALLBACK_CONSOLE', 'true') === 'true';
+
+    console.log(
+      `LogTransport configurado: logstash=${this.elkConfig.logstashHost}:${this.elkConfig.logstashPort}, elk=${this.elkConfig.enabled}, failSafe=${this.failSafe}`,
+    );
   }
 
   async onModuleInit() {
@@ -44,60 +71,153 @@ export class LogTransportService implements OnModuleInit {
     }
 
     if (this.elkConfig.enabled) {
-      this.connectToLogstash();
+      // Iniciar conexión de forma asíncrona sin bloquear la inicialización
+      setImmediate(() => this.connectToLogstash());
+    }
+  }
+
+  async onModuleDestroy() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+    }
+
+    if (this.logstashClient) {
+      this.logstashClient.destroy();
+    }
+
+    if (this.currentLogStream) {
+      this.currentLogStream.end();
     }
   }
 
   private ensureLogDirectoryExists() {
-    if (!fs.existsSync(this.logDir)) {
-      fs.mkdirSync(this.logDir, { recursive: true });
+    try {
+      if (!fs.existsSync(this.logDir)) {
+        fs.mkdirSync(this.logDir, { recursive: true });
+      }
+    } catch (error) {
+      console.error(`Error al crear directorio de logs: ${error.message}`);
     }
   }
 
-  private connectToLogstash() {
+  private async connectToLogstash() {
+    if (
+      this.isConnecting ||
+      this.connectionAttempts >= this.maxConnectionAttempts
+    ) {
+      return;
+    }
+
+    this.isConnecting = true;
+    this.connectionAttempts++;
+
     try {
       const { logstashHost, logstashPort } = this.elkConfig;
-      
+
+      console.log(
+        `Intento ${this.connectionAttempts}/${this.maxConnectionAttempts} de conexión a Logstash: ${logstashHost}:${logstashPort}`,
+      );
+
       this.logstashClient = new net.Socket();
-      
+
+      // Configurar timeout de conexión
+      this.logstashClient.setTimeout(10000);
+
       this.logstashClient.connect(logstashPort, logstashHost, () => {
-        console.log(`Conectado a Logstash en ${logstashHost}:${logstashPort}`);
+        console.log(
+          `✅ Conectado a Logstash en ${logstashHost}:${logstashPort}`,
+        );
+        this.connectionAttempts = 0; // Reset counter on successful connection
+        this.isConnecting = false;
+        this.processLogQueue();
       });
 
       this.logstashClient.on('error', (err) => {
-        console.error(`Error en conexión con Logstash: ${err.message}`);
-        this.logstashClient = null;
-        
-        // Reconectar después de 5 segundos
-        setTimeout(() => this.connectToLogstash(), 5000);
+        console.error(
+          `❌ Error en conexión con Logstash (intento ${this.connectionAttempts}): ${err.message}`,
+        );
+        this.handleConnectionError();
+      });
+
+      this.logstashClient.on('timeout', () => {
+        console.error(
+          `⏱️ Timeout en conexión con Logstash (intento ${this.connectionAttempts})`,
+        );
+        this.handleConnectionError();
       });
 
       this.logstashClient.on('close', () => {
-        console.log('Conexión con Logstash cerrada');
+        console.log(
+          `🔌 Conexión con Logstash cerrada (intento ${this.connectionAttempts})`,
+        );
         this.logstashClient = null;
-        
-        // Reconectar después de 5 segundos
-        setTimeout(() => this.connectToLogstash(), 5000);
+        this.scheduleReconnection();
       });
     } catch (error) {
-      console.error(`Error al conectar con Logstash: ${error.message}`);
+      console.error(
+        `💥 Error al intentar conectar con Logstash: ${error.message}`,
+      );
+      this.handleConnectionError();
     }
   }
 
-  private getLogStream(): fs.WriteStream {
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (this.currentLogDate !== today || !this.currentLogStream) {
-      if (this.currentLogStream) {
-        this.currentLogStream.end();
-      }
-      
-      this.currentLogDate = today;
-      const logFilePath = path.join(this.logDir, `application-${today}.log`);
-      this.currentLogStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+  private handleConnectionError() {
+    this.isConnecting = false;
+
+    if (this.logstashClient) {
+      this.logstashClient.destroy();
+      this.logstashClient = null;
     }
-    
-    return this.currentLogStream;
+
+    this.scheduleReconnection();
+  }
+
+  private scheduleReconnection() {
+    if (this.connectionAttempts >= this.maxConnectionAttempts) {
+      console.error(
+        `🚫 Máximo número de intentos de conexión alcanzado (${this.maxConnectionAttempts}). Deshabilitando ELK.`,
+      );
+      this.elkConfig.enabled = false;
+      this.processLogQueue(); // Procesar cola pendiente con fallback
+      return;
+    }
+
+    const delay = Math.min(5000 * this.connectionAttempts, 30000);
+    console.log(`⏳ Reintentando conexión a Logstash en ${delay / 1000}s...`);
+
+    this.reconnectTimeout = setTimeout(() => {
+      this.connectToLogstash();
+    }, delay);
+  }
+
+  private processLogQueue() {
+    while (this.logQueue.length > 0) {
+      const logData = this.logQueue.shift();
+      this.sendLogNow(logData);
+    }
+  }
+
+  private getLogStream(): fs.WriteStream | null {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+
+      if (this.currentLogDate !== today || !this.currentLogStream) {
+        if (this.currentLogStream) {
+          this.currentLogStream.end();
+        }
+
+        this.currentLogDate = today;
+        const logFilePath = path.join(this.logDir, `application-${today}.log`);
+        this.currentLogStream = fs.createWriteStream(logFilePath, {
+          flags: 'a',
+        });
+      }
+
+      return this.currentLogStream;
+    } catch (error) {
+      console.error(`Error al obtener stream de log: ${error.message}`);
+      return null;
+    }
   }
 
   sendLog(logData: any): void {
@@ -109,12 +229,32 @@ export class LogTransportService implements OnModuleInit {
       pid: process.pid,
     };
 
-    const logString = JSON.stringify(logWithMetadata);
+    // Si ELK está habilitado pero no hay conexión, encolar
+    if (
+      this.elkConfig.enabled &&
+      !this.logstashClient &&
+      this.logQueue.length < this.maxQueueSize
+    ) {
+      this.logQueue.push(logWithMetadata);
+      return;
+    }
 
-    // Enviar a Logstash si está habilitado
-    if (this.elkConfig.enabled && this.logstashClient) {
+    this.sendLogNow(logWithMetadata);
+  }
+
+  private sendLogNow(logWithMetadata: any): void {
+    const logString = JSON.stringify(logWithMetadata);
+    let logSent = false;
+
+    // Intentar enviar a Logstash si está disponible
+    if (
+      this.elkConfig.enabled &&
+      this.logstashClient &&
+      this.logstashClient.writable
+    ) {
       try {
         this.logstashClient.write(logString + '\n');
+        logSent = true;
       } catch (error) {
         console.error(`Error al enviar log a Logstash: ${error.message}`);
       }
@@ -124,13 +264,35 @@ export class LogTransportService implements OnModuleInit {
     if (this.fileTransport) {
       try {
         const logStream = this.getLogStream();
-        logStream.write(logString + '\n');
+        if (logStream) {
+          logStream.write(logString + '\n');
+          logSent = true;
+        }
       } catch (error) {
         console.error(`Error al escribir log en archivo: ${error.message}`);
       }
     }
 
-    // Siempre mostrar en consola
-    console.log(logString);
+    // Fallback a consola si está habilitado y no se envió por otros medios
+    if (this.fallbackToConsole && (!logSent || !this.elkConfig.enabled)) {
+      console.log(logString);
+    }
   }
-} 
+
+  // Método para verificar el estado de la conexión
+  isLogstashConnected(): boolean {
+    return this.logstashClient !== null && this.logstashClient.writable;
+  }
+
+  // Método para obtener estadísticas
+  getStats() {
+    return {
+      elkEnabled: this.elkConfig.enabled,
+      logstashConnected: this.isLogstashConnected(),
+      connectionAttempts: this.connectionAttempts,
+      queueSize: this.logQueue.length,
+      fileTransportEnabled: this.fileTransport,
+    };
+  }
+}
+

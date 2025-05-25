@@ -48,7 +48,8 @@ export class SupplierService {
     const subscription = this.subscriptionRepository.create({
       is_subscribed: createSupplierDto.is_subscribed || false,
       has_card_subscription: createSupplierDto.has_card_subscription || false,
-      has_sensor_subscription: createSupplierDto.has_sensor_subscription || false,
+      has_sensor_subscription:
+        createSupplierDto.has_sensor_subscription || false,
       max_employee_count: createSupplierDto.employee_count || 0,
       max_card_count: createSupplierDto.card_count || 0,
       supplier: savedSupplier,
@@ -61,8 +62,11 @@ export class SupplierService {
       const temporalPassword = 'Temporal123';
       try {
         const employee = await this.employeeService.create({
-          first_name: createSupplierDto.supplier_creator.split(' ')[0] || 'Admin',
-          last_name: createSupplierDto.supplier_creator.split(' ').slice(1).join(' ') || 'User',
+          first_name:
+            createSupplierDto.supplier_creator.split(' ')[0] || 'Admin',
+          last_name:
+            createSupplierDto.supplier_creator.split(' ').slice(1).join(' ') ||
+            'User',
           email: createSupplierDto.contact_email,
           password: temporalPassword,
           is_creator: true,
@@ -132,34 +136,44 @@ export class SupplierService {
     }
 
     // Actualizar datos del proveedor
-    if (updateSupplierDto.supplier_name) supplier.supplier_name = updateSupplierDto.supplier_name;
-    if (updateSupplierDto.supplier_creator) supplier.supplier_creator = updateSupplierDto.supplier_creator;
-    if (updateSupplierDto.contact_email) supplier.contact_email = updateSupplierDto.contact_email;
-    if (updateSupplierDto.phone_number) supplier.phone_number = updateSupplierDto.phone_number;
+    if (updateSupplierDto.supplier_name)
+      supplier.supplier_name = updateSupplierDto.supplier_name;
+    if (updateSupplierDto.supplier_creator)
+      supplier.supplier_creator = updateSupplierDto.supplier_creator;
+    if (updateSupplierDto.contact_email)
+      supplier.contact_email = updateSupplierDto.contact_email;
+    if (updateSupplierDto.phone_number)
+      supplier.phone_number = updateSupplierDto.phone_number;
     if (updateSupplierDto.address) supplier.address = updateSupplierDto.address;
-    if (updateSupplierDto.description) supplier.description = updateSupplierDto.description;
-    if (updateSupplierDto.logo_url) supplier.logo_url = updateSupplierDto.logo_url;
+    if (updateSupplierDto.description)
+      supplier.description = updateSupplierDto.description;
+    if (updateSupplierDto.logo_url)
+      supplier.logo_url = updateSupplierDto.logo_url;
     if (updateSupplierDto.additional_info) {
-      supplier.additional_info = typeof updateSupplierDto.additional_info === 'string' 
-        ? JSON.parse(updateSupplierDto.additional_info) 
-        : updateSupplierDto.additional_info;
+      supplier.additional_info =
+        typeof updateSupplierDto.additional_info === 'string'
+          ? JSON.parse(updateSupplierDto.additional_info)
+          : updateSupplierDto.additional_info;
     }
 
     await this.supplierRepository.save(supplier);
 
     // Actualizar datos de suscripción
     if (supplier.subscription) {
-      if (updateSupplierDto.is_subscribed !== undefined) 
+      if (updateSupplierDto.is_subscribed !== undefined)
         supplier.subscription.is_subscribed = updateSupplierDto.is_subscribed;
-      if (updateSupplierDto.has_card_subscription !== undefined) 
-        supplier.subscription.has_card_subscription = updateSupplierDto.has_card_subscription;
-      if (updateSupplierDto.has_sensor_subscription !== undefined) 
-        supplier.subscription.has_sensor_subscription = updateSupplierDto.has_sensor_subscription;
-      if (updateSupplierDto.employee_count !== undefined) 
-        supplier.subscription.max_employee_count = updateSupplierDto.employee_count;
-      if (updateSupplierDto.card_count !== undefined) 
+      if (updateSupplierDto.has_card_subscription !== undefined)
+        supplier.subscription.has_card_subscription =
+          updateSupplierDto.has_card_subscription;
+      if (updateSupplierDto.has_sensor_subscription !== undefined)
+        supplier.subscription.has_sensor_subscription =
+          updateSupplierDto.has_sensor_subscription;
+      if (updateSupplierDto.employee_count !== undefined)
+        supplier.subscription.max_employee_count =
+          updateSupplierDto.employee_count;
+      if (updateSupplierDto.card_count !== undefined)
         supplier.subscription.max_card_count = updateSupplierDto.card_count;
-      
+
       await this.subscriptionRepository.save(supplier.subscription);
     }
 
@@ -188,7 +202,7 @@ export class SupplierService {
       throw new BadRequestException('El proveedor no existe');
     }
 
-    supplier.profile_image_url = imageUrl;
+    supplier.profile_image_url = imageUrl; // Cambiar la URL de la imagen de perfil
     await this.supplierRepository.save(supplier);
     return supplier; // Opcional: devolver el proveedor actualizado
   }

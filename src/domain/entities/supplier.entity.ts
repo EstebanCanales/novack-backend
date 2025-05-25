@@ -9,19 +9,18 @@ import {
 import { Employee } from './employee.entity';
 import { Visitor } from './visitor.entity';
 import { Card } from './card.entity';
-import { Sensor } from './sensor.entity';
 import { SupplierSubscription } from './supplier-subscription.entity';
 
 @Entity({ name: 'suppliers' })
 export class Supplier {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id: string; //no  ol
 
   @Column()
   supplier_name: string;
 
   @Column({ nullable: true })
-  supplier_creator: string;
+  supplier_creator: string; //no
 
   @Column({ unique: true })
   contact_email: string;
@@ -38,17 +37,17 @@ export class Supplier {
   @Column({ nullable: true })
   logo_url: string;
 
-  @Column({ type: 'jsonb', nullable: true })
-  additional_info: Record<string, any>;
-
   @Column({ nullable: true })
   profile_image_url?: string;
 
+  @Column({ type: 'jsonb', nullable: true })
+  additional_info: Record<string, any>;
+
   @CreateDateColumn()
-  created_at: Date;
+  created_at: Date; //no
 
   @UpdateDateColumn()
-  updated_at: Date;
+  updated_at: Date; //no
 
   // Relaciones
   @OneToMany(() => Employee, (employee) => employee.supplier)
@@ -59,9 +58,6 @@ export class Supplier {
 
   @OneToMany(() => Card, (card) => card.supplier)
   cards: Card[];
-
-  @OneToMany(() => Sensor, (sensor) => sensor.supplier)
-  sensors: Sensor[];
 
   // Relación con SupplierSubscription - sin decorador para evitar referencias circulares
   subscription?: SupplierSubscription;
