@@ -1,4 +1,9 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as net from 'net';
 import * as os from 'os';
@@ -26,29 +31,39 @@ export class LogstashService implements OnModuleInit, OnModuleDestroy {
   private readonly hostname = os.hostname();
 
   constructor(private readonly configService: ConfigService) {
-    const environment = this.configService.get<string>('NODE_ENV', 'development');
-    
+    const environment = this.configService.get<string>(
+      'NODE_ENV',
+      'development',
+    );
+
     // Usar localhost en entorno de desarrollo cuando se ejecuta fuera de Docker
-    const host = environment === 'development' && !process.env.DOCKER_CONTAINER
-      ? 'localhost'
-      : this.configService.get<string>('LOGSTASH_HOST', 'logstash');
-    
+    const host =
+      environment === 'development' && !process.env.DOCKER_CONTAINER
+        ? 'localhost'
+        : this.configService.get<string>('LOGSTASH_HOST', 'logstash');
+
     this.config = {
-      enabled: this.configService.get<string>('ELK_ENABLED', 'false') === 'true',
+      enabled:
+        this.configService.get<string>('ELK_ENABLED', 'false') === 'true',
       host: host,
-      port: parseInt(this.configService.get<string>('LOGSTASH_PORT', '50000'), 10),
+      port: parseInt(
+        this.configService.get<string>('LOGSTASH_PORT', '50000'),
+        10,
+      ),
       appName: this.configService.get<string>('APP_NAME', 'novack-backend'),
       environment: environment,
     };
-    
-    this.logger.log(`Configuración de Logstash: host=${this.config.host}, port=${this.config.port}, enabled=${this.config.enabled}`);
+
+    this.logger.log(
+      `Configuración de Logstash: host=${this.config.host}, port=${this.config.port}, enabled=${this.config.enabled}`,
+    );
   }
 
   async onModuleInit() {
     if (this.config.enabled) {
       // Añadir un retraso inicial de 5 segundos para permitir que Logstash esté completamente disponible
       this.logger.log('Esperando 5 segundos antes de conectar a Logstash...');
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise((resolve) => setTimeout(resolve, 5000));
       this.connect();
     } else {
       this.logger.log('Logstash está desactivado en la configuración');
@@ -69,8 +84,10 @@ export class LogstashService implements OnModuleInit, OnModuleDestroy {
     this.client.connect(this.config.port, this.config.host, () => {
       this.isConnected = true;
       this.reconnectAttempts = 0;
-      this.logger.log(`Conectado a Logstash en ${this.config.host}:${this.config.port}`);
-      
+      this.logger.log(
+        `Conectado a Logstash en ${this.config.host}:${this.config.port}`,
+      );
+
       // Procesar mensajes en cola
       this.processQueue();
     });
@@ -96,10 +113,17 @@ export class LogstashService implements OnModuleInit, OnModuleDestroy {
 
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      this.logger.log(`Intentando reconectar a Logstash (intento ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-      this.reconnectTimeout = setTimeout(() => this.connect(), this.reconnectInterval);
+      this.logger.log(
+        `Intentando reconectar a Logstash (intento ${this.reconnectAttempts}/${this.maxReconnectAttempts})`,
+      );
+      this.reconnectTimeout = setTimeout(
+        () => this.connect(),
+        this.reconnectInterval,
+      );
     } else {
-      this.logger.error(`Se alcanzó el número máximo de intentos de reconexión (${this.maxReconnectAttempts})`);
+      this.logger.error(
+        `Se alcanzó el número máximo de intentos de reconexión (${this.maxReconnectAttempts})`,
+      );
     }
   }
 
@@ -123,7 +147,7 @@ export class LogstashService implements OnModuleInit, OnModuleDestroy {
     if (this.messageQueue.length >= this.maxQueueSize) {
       this.messageQueue.shift(); // Eliminar el mensaje más antiguo
     }
-    
+
     this.messageQueue.push(message);
   }
 
@@ -138,7 +162,9 @@ export class LogstashService implements OnModuleInit, OnModuleDestroy {
         try {
           this.client.write(message + '\n');
         } catch (error) {
-          this.logger.error(`Error al enviar mensaje desde la cola: ${error.message}`);
+          this.logger.error(
+            `Error al enviar mensaje desde la cola: ${error.message}`,
+          );
           // Volver a poner el mensaje en la cola si hay error
           this.addToQueue(message);
           break;
@@ -173,7 +199,10 @@ export class LogstashService implements OnModuleInit, OnModuleDestroy {
       }
     } else {
       this.addToQueue(logMessage);
-      if (!this.isConnected && this.reconnectAttempts < this.maxReconnectAttempts) {
+      if (
+        !this.isConnected &&
+        this.reconnectAttempts < this.maxReconnectAttempts
+      ) {
         this.connect();
       }
     }
@@ -190,7 +219,12 @@ export class LogstashService implements OnModuleInit, OnModuleDestroy {
   }
 
   // Método para registro de logs de error
-  error(message: string, trace?: string, context?: string, correlationId?: string): void {
+  error(
+    message: string,
+    trace?: string,
+    context?: string,
+    correlationId?: string,
+  ): void {
     this.send({
       level: 'error',
       message,
@@ -224,4 +258,4 @@ export class LogstashService implements OnModuleInit, OnModuleDestroy {
   isLogstashConnected(): boolean {
     return this.isConnected;
   }
-} 
+}

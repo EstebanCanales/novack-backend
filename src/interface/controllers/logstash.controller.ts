@@ -33,10 +33,11 @@ export class LogstashController {
   @ApiOperation({ summary: 'Enviar un mensaje de prueba a Logstash' })
   testLogstash(@Body() logMessage: LogMessage) {
     const { message, level, context, correlationId } = logMessage;
-    
+
     this.logger.log(`Enviando mensaje de prueba a Logstash: ${message}`);
-    
-    switch(level.toLowerCase()) {
+    const logLevel = level ? level.toLowerCase() : 'info';
+
+    switch (logLevel) {
       case 'error':
         this.logstashService.error(message, undefined, context, correlationId);
         break;
@@ -51,11 +52,12 @@ export class LogstashController {
         this.logstashService.info(message, context, correlationId);
         break;
     }
-    
+
     return {
       sent: true,
       message: `Mensaje enviado a Logstash: ${message}`,
       timestamp: new Date().toISOString(),
     };
   }
-} 
+}
+

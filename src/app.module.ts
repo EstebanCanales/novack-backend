@@ -12,7 +12,6 @@ import { SupplierModule } from './application/modules/supplier.module';
 import { CardModule } from './application/modules/card.module';
 import { EmployeeModule } from './application/modules/employee.module';
 import { VisitorModule } from './application/modules/visitor.module';
-import { SensorModule } from './application/modules/sensor.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { SecurityModule } from './application/modules/security.module';
 import { EmailModule } from './application/modules/email.module';
@@ -32,6 +31,7 @@ import { DataMaskingInterceptor } from './application/interceptors/data-masking.
 import { RedisTestController } from './interface/controllers/redis-test.controller';
 import { LoggingModule } from './infrastructure/logging/logging.module';
 import { LogstashModule } from './infrastructure/services/logstash.module';
+import { HealthModule } from './application/modules/health.module';
 import { TokenModule } from './application/modules/token.module';
 
 /**
@@ -66,7 +66,7 @@ import { TokenModule } from './application/modules/token.module';
     ]),
     // Programación de tareas
     ScheduleModule.forRoot(),
-    
+
     // Database and infrastructure modules
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -89,7 +89,6 @@ import { TokenModule } from './application/modules/token.module';
     CardModule, // Access card management
     VisitorModule, // Visitor registration and tracking
     SupplierModule, // Supplier management
-    SensorModule, // IoT sensor data handling
     CardSchedulerModule, // Automated card assignment and tracking
     // CompanyModule,
     // ServiceModule,
@@ -107,9 +106,12 @@ import { TokenModule } from './application/modules/token.module';
     EmailModule, // Email service integration
     EmailVerificationModule, // Email verification workflows
     ChatModule, // Chat service with WebSockets
-    
+
     // Maintenance modules
     DatabaseResetModule, // Database reset functionality (development only)
+
+    // Healthcheck module
+    HealthModule,
 
     // Additional modules
     /*
@@ -129,9 +131,7 @@ import { TokenModule } from './application/modules/token.module';
     LoggingModule,
     LogstashModule, // Nuevo módulo para gestionar conexión con Logstash
   ],
-  controllers: [
-    RedisTestController
-  ],
+  controllers: [RedisTestController],
   providers: [
     // Interceptor global para enmascarar datos sensibles
     {

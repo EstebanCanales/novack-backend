@@ -19,7 +19,8 @@ services:
       test: ["CMD-SHELL", "curl --silent --fail localhost:9200/_cluster/health || exit 1"]
       interval: 30s
       timeout: 30s
-      retries: 3
+      retries: 5
+      start_period: 60s
     networks:
       - elk_network
 
@@ -38,13 +39,14 @@ services:
       elasticsearch:
         condition: service_healthy 
     healthcheck:
-      test: ["CMD", "curl", "--silent", "--fail", "localhost:9600/?pretty"]
+      test: ["CMD-SHELL", "curl --silent --fail localhost:9600 || exit 1"]
       interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
     networks:
       - elk_network
+    restart: unless-stopped
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.4
@@ -66,15 +68,37 @@ services:
     volumes:
       - ./config/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
       - ./logs:/var/log/app_logs:ro 
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro # Para logs de contenedores Docker
-      - /var/run/docker.sock:/var/run/docker.sock:ro # Para metadatos de Docker
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     command: filebeat -e -strict.perms=false
     depends_on: 
       logstash:
-        condition: service_started 
+        condition: service_healthy
     networks:
       - elk_network
+    restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    command: -p 5430
+    ports:
+      - '5430:5430'
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=novack
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d novack -p 5430'] 
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # Servicio API modificado para manejar mejor las dependencias
   api:
     build:
       context: .
@@ -106,34 +130,28 @@ services:
       - ELASTICSEARCH_HOST=http://elasticsearch:9200
       - ELK_ENABLED=true 
       - DOCKER_CONTAINER=true
+      - LOG_TO_FILE=true
+      - LOG_LEVEL=info
+      # Variables para manejo de fallos de ELK
+      - ELK_FAIL_SAFE=true
+      - LOG_FALLBACK_CONSOLE=true
     depends_on:
       postgres:
         condition: service_healthy
-      logstash: 
-        condition: service_healthy
+    # CAMBIO CRÍTICO: La API ya NO depende de logstash para iniciar
+    # En su lugar, manejamos la conexión de forma asíncrona
     networks:
       - app-network  
-      - elk_network  
-
-  postgres:
-    image: postgres:16-alpine
-    container_name: postgres # Añadir nombre de contenedor por consistencia
-    command: -p 5430 # El puerto interno que usará Postgres
-    ports:
-      - '5430:5430' # Mapea el puerto interno 5430 al puerto 5430 del host
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=novack
+      - elk_network
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./logs:/usr/src/app/logs
+    restart: unless-stopped
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d novack -p 5430'] 
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - app-network
+      test: ["CMD-SHELL", "curl --fail http://localhost:4000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   postgres_data:

@@ -1,73 +1,64 @@
 filebeat.inputs:
   - type: filestream
-    id: novack-backend
+    id: novack-backend-logs
     enabled: true
     paths:
       - /var/log/app_logs/*.log
-      - ${path.config}/../../logs/*.log # Ruta relativa para desarrollo
-    harvester_limit: 5
-    scan_frequency: 10s
+      - /var/log/*.log
     fields:
       app: 'novack-backend'
       environment: 'development'
+      source: 'filestream'
     fields_under_root: true
     json.keys_under_root: true
-    json.message_key: 'message'
     json.overwrite_keys: true
-
-  - type: container
-    paths:
-      - '/var/lib/docker/containers/*/*.log'
+    json.message_key: 'message'
+    scan_frequency: 5s
     harvester_limit: 5
-    fields:
-      source: 'docker'
-      environment: 'development'
-    fields_under_root: true
+    close_inactive: 5m
+    close_renamed: true
+    close_removed: true
+    clean_inactive: 24h
 
 processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
   - add_docker_metadata:
       host: 'unix:///var/run/docker.sock'
-  - decode_json_fields:
-      fields: ['message']
-      target: ''
-      overwrite_keys: true
-  - add_host_metadata: ~
-  - add_cloud_metadata: ~
-  - add_process_metadata:
-      match_pids: ['process.pid']
-  - timestamp:
-      field: timestamp
-      target_field: '@timestamp'
-      layouts:
-        - '2006-01-02T15:04:05.999Z'
-      test:
-        - '2025-05-13T20:51:14.883Z'
-      ignore_missing: true
-      ignore_failure: true
 
-filebeat.config.modules:
-  path: ${path.config}/modules.d/*.yml
-  reload.enabled: false
-
+# Configuración de output
 output.logstash:
   hosts: ['logstash:5044']
-  bulk_max_size: 50
-  worker: 1
-  pipelining: 0
-  # Configurar timeout para mejor manejo de reconexiones
-  timeout: 30s
+  bulk_max_size: 2048
+  worker: 2
+  timeout: 60s
   backoff.init: 1s
-  backoff.max: 60s
+  backoff.max: 30s
+  ssl.enabled: false
 
-logging.level: info
+# Configuración de logging
+logging.level: debug
+logging.to_stderr: true
 logging.to_files: true
 logging.files:
   path: /var/log/filebeat
-  name: filebeat
+  name: filebeat.log
   keepfiles: 7
   permissions: 0644
 
-# Habilitar monitoreo de Filebeat desde Kibana
+# Configuración de monitoreo (simplificada)
 monitoring.enabled: true
 monitoring.elasticsearch:
   hosts: ['elasticsearch:9200']
+
+# Configuración adicional para estabilidad
+queue.mem:
+  events: 8192
+  flush.min_events: 1024
+  flush.timeout: 2s
+
+# Configuración de gestión de archivos
+filebeat.registry:
+  path: /usr/share/filebeat/data/registry
+  file_permissions: 0644
+  flush: 1s

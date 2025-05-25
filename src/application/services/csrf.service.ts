@@ -10,7 +10,7 @@ export class CsrfService {
     // Crear una instancia del generador de tokens CSRF con configuración segura
     this.tokens = new Tokens({
       secretLength: 32, // Longitud del secreto
-      saltLength: 10,  // Longitud del salt
+      saltLength: 10, // Longitud del salt
     });
   }
 
@@ -44,4 +44,5 @@ export class CsrfService {
       return false;
     }
   }
-} 
+}
+
