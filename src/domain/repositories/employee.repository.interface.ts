@@ -20,4 +20,13 @@ export interface IEmployeeRepository {
   updateCredentials(employeeId: string, credentials: Partial<EmployeeCredentials>): Promise<void>;
   findByVerificationToken(token: string): Promise<Employee | null>;
   findByResetToken(token: string): Promise<Employee | null>;
-} 
+
+  /**
+   * Saves an employee entity. If the entity has an ID and exists in the database, it's updated.
+   * Otherwise, it's inserted. This method should handle cascading saves for related entities
+   * like EmployeeCredentials if they are part of the Employee aggregate and configured with cascades.
+   * @param employee The employee entity to save.
+   * @returns The saved employee entity.
+   */
+  save(employee: Employee): Promise<Employee>;
+}
