@@ -5,16 +5,18 @@ import { IAppointmentRepository } from '../../../../domain/repositories/appointm
 import { CardService } from '../../../services/card.service';
 import { EmailService } from '../../../services/email.service';
 import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
-import { Visitor, Appointment, Card } from '../../../../domain/entities'; // Assuming Card entity path
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { Visitor } from '../../../../domain/entities/visitor.entity';
+import { Appointment } from '../../../../domain/entities/appointment.entity';
+import { Card } from '../../../../domain/entities/card.entity';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 
-// Mocks
+// --- Mocks ---
 const mockVisitorRepository = {
   findById: jest.fn(),
   save: jest.fn(),
 };
 const mockAppointmentRepository = {
-  findById: jest.fn(),
+  findById: jest.fn(), // For fetching the specific appointment
   save: jest.fn(),
 };
 const mockCardService = {
@@ -32,13 +34,47 @@ const mockLoggerService = {
 
 describe('CheckOutVisitorUseCase', () => {
   let useCase: CheckOutVisitorUseCase;
+  let visitorRepo: IVisitorRepository;
+  let appointmentRepo: IAppointmentRepository;
+  let cardService: CardService;
+  let emailService: EmailService;
+
+  const visitorId = 'visitor-checkout-uuid';
+  const appointmentId = 'appt-checkout-uuid';
+  const cardId = 'card-checkout-uuid';
+
+  const mockCheckedInAppointmentBase = { // Renamed to avoid conflict
+    id: appointmentId,
+    title: 'Checked In Appointment',
+    check_in_time: new Date(Date.now() - 3600000), // Checked in 1 hour ago
+    check_out_time: null,
+    status: 'en_progreso',
+    // other fields...
+  } as Appointment;
+
+  const mockVisitorWithCardBase = { // Renamed to avoid conflict
+    id: visitorId,
+    name: 'Visitor With Card',
+    email: 'visitor.card@example.com',
+    state: 'en_progreso',
+    appointments: [mockCheckedInAppointmentBase], // Use base mock
+    card: { id: cardId } as Card,
+    location: 'Test Location',
+  } as Visitor;
+
+  const mockVisitorWithoutCardBase = { // Renamed to avoid conflict
+    id: visitorId,
+    name: 'Visitor No Card',
+    email: 'visitor.nocard@example.com',
+    state: 'en_progreso',
+    appointments: [mockCheckedInAppointmentBase], // Use base mock
+    card: null,
+    location: 'Test Location',
+  } as Visitor;
+
 
   beforeEach(async () => {
-    Object.values(mockVisitorRepository).forEach(mockFn => mockFn.mockReset());
-    Object.values(mockAppointmentRepository).forEach(mockFn => mockFn.mockReset());
-    Object.values(mockCardService).forEach(mockFn => mockFn.mockReset());
-    Object.values(mockEmailService).forEach(mockFn => mockFn.mockReset());
-    Object.values(mockLoggerService).forEach(mockFn => mockFn.mockReset());
+    jest.resetAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -52,13 +88,114 @@ describe('CheckOutVisitorUseCase', () => {
     }).compile();
 
     useCase = module.get<CheckOutVisitorUseCase>(CheckOutVisitorUseCase);
+    visitorRepo = module.get<IVisitorRepository>(IVisitorRepository);
+    appointmentRepo = module.get<IAppointmentRepository>(IAppointmentRepository);
+    cardService = module.get<CardService>(CardService);
+    emailService = module.get<EmailService>(EmailService);
   });
 
   it('should be defined', () => {
     expect(useCase).toBeDefined();
   });
 
-  // TODO: Add tests for various scenarios:
-  // visitor not found, visitor already checked out, no appointments,
-  // appointment not checked in, successful checkout (with/without card, with/without email success/failure).
+  describe('execute', () => {
+    let mockVisitorWithCard: Visitor;
+    let mockVisitorWithoutCard: Visitor;
+    let mockCheckedInAppointment: Appointment;
+
+    beforeEach(() => {
+      // Create fresh copies for each test to avoid state leakage across tests if objects are mutated
+      mockCheckedInAppointment = JSON.parse(JSON.stringify(mockCheckedInAppointmentBase)) as Appointment;
+      mockCheckedInAppointment.check_in_time = new Date(mockCheckedInAppointment.check_in_time); // Restore Date object
+
+      mockVisitorWithCard = JSON.parse(JSON.stringify(mockVisitorWithCardBase)) as Visitor;
+      mockVisitorWithCard.appointments = [mockCheckedInAppointment];
+      if (mockVisitorWithCard.card) mockVisitorWithCard.card.id = cardId; // Ensure card ID
+
+      mockVisitorWithoutCard = JSON.parse(JSON.stringify(mockVisitorWithoutCardBase)) as Visitor;
+      mockVisitorWithoutCard.appointments = [mockCheckedInAppointment];
+
+      // Default successful mock implementations
+      mockVisitorRepository.findById.mockResolvedValue(mockVisitorWithCard);
+      mockAppointmentRepository.findById.mockResolvedValue(mockCheckedInAppointment);
+      mockVisitorRepository.save.mockImplementation(v => Promise.resolve(v as Visitor));
+      mockAppointmentRepository.save.mockImplementation(a => Promise.resolve(a as Appointment));
+      mockCardService.unassignFromVisitor.mockResolvedValue(undefined as any); // TypeORM remove often returns void
+      mockEmailService.sendVisitorCheckoutEmail.mockResolvedValue({id: 'email-id'} as any); // Resend type
+    });
+
+    it('should successfully check out a visitor with a card, unassign card, and send email', async () => {
+      const result = await useCase.execute(visitorId);
+
+      expect(visitorRepo.findById).toHaveBeenCalledWith(visitorId);
+      expect(appointmentRepo.findById).toHaveBeenCalledWith(appointmentId);
+      expect(appointmentRepo.save).toHaveBeenCalledWith(expect.objectContaining({ status: 'completado', check_out_time: expect.any(Date) }));
+      expect(visitorRepo.save).toHaveBeenCalledWith(expect.objectContaining({ state: 'completado' }));
+      expect(cardService.unassignFromVisitor).toHaveBeenCalledWith(cardId);
+      expect(emailService.sendVisitorCheckoutEmail).toHaveBeenCalled();
+      expect(result.state).toEqual('completado');
+      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Visitor check-out initiated'), { visitorId });
+      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Appointment updated to "completado"'), expect.objectContaining({ appointmentId }));
+      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Visitor state updated to "completado"'), expect.objectContaining({ visitorId }));
+      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Card unassigned'), expect.objectContaining({ cardId }));
+      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Visitor checkout email dispatch requested'), expect.objectContaining({ visitorId }));
+    });
+
+    it('should successfully check out a visitor without a card', async () => {
+      mockVisitorRepository.findById.mockResolvedValue(mockVisitorWithoutCard);
+
+      await useCase.execute(visitorId);
+
+      expect(cardService.unassignFromVisitor).not.toHaveBeenCalled();
+      expect(mockLoggerService.log).not.toHaveBeenCalledWith(expect.stringContaining('Card unassigned'), expect.anything());
+      expect(visitorRepo.save).toHaveBeenCalledWith(expect.objectContaining({ state: 'completado' }));
+      expect(emailService.sendVisitorCheckoutEmail).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException if visitor not found', async () => {
+      mockVisitorRepository.findById.mockResolvedValue(null);
+      await expect(useCase.execute(visitorId)).rejects.toThrow(NotFoundException);
+      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Visitor not found for check-out'), { visitorId });
+    });
+
+    it('should throw BadRequestException if visitor already checked out', async () => {
+      mockVisitorRepository.findById.mockResolvedValue({ ...mockVisitorWithCard, state: 'completado' } as Visitor);
+      await expect(useCase.execute(visitorId)).rejects.toThrow(BadRequestException);
+      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Visitor already checked out'), expect.objectContaining({ visitorId }));
+    });
+
+    it('should throw BadRequestException if visitor has no appointments', async () => {
+      mockVisitorRepository.findById.mockResolvedValue({ ...mockVisitorWithCard, appointments: [] } as Visitor);
+      await expect(useCase.execute(visitorId)).rejects.toThrow(BadRequestException);
+      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('No appointments found for visitor during check-out'), { visitorId });
+    });
+
+    it('should throw NotFoundException if specific appointment not found', async () => {
+      mockVisitorRepository.findById.mockResolvedValue(mockVisitorWithCard); // Visitor has an appointment ID listed
+      mockAppointmentRepository.findById.mockResolvedValue(null); // But it's not found
+      await expect(useCase.execute(visitorId)).rejects.toThrow(NotFoundException);
+      expect(mockLoggerService.error).toHaveBeenCalledWith(expect.stringContaining('Associated appointment not found during checkout'), expect.objectContaining({ visitorId, appointmentId }));
+    });
+
+    it('should throw BadRequestException if appointment not checked in', async () => {
+      mockAppointmentRepository.findById.mockResolvedValue({ ...mockCheckedInAppointment, check_in_time: null } as any);
+      await expect(useCase.execute(visitorId)).rejects.toThrow(BadRequestException);
+      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Visitor has not checked in for this appointment'), expect.objectContaining({ visitorId, appointmentId }));
+    });
+
+    it('should log warning if unassigning card fails but still complete checkout', async () => {
+      mockCardService.unassignFromVisitor.mockRejectedValue(new Error('Unassign failed'));
+      await useCase.execute(visitorId); // Should not throw
+      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Failed to unassign card during check-out'), expect.objectContaining({ visitorId, cardId, error: 'Unassign failed' }));
+      expect(visitorRepo.save).toHaveBeenCalledWith(expect.objectContaining({ state: 'completado' }));
+      expect(emailService.sendVisitorCheckoutEmail).toHaveBeenCalled();
+    });
+
+    it('should log warning if sending checkout email fails but still complete checkout', async () => {
+      mockEmailService.sendVisitorCheckoutEmail.mockRejectedValue(new Error('Email send failed'));
+      await useCase.execute(visitorId); // Should not throw
+      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Failed to send visitor checkout email for'), expect.objectContaining({ visitorId, error: 'Email send failed' }));
+      expect(visitorRepo.save).toHaveBeenCalledWith(expect.objectContaining({ state: 'completado' }));
+    });
+  });
 });

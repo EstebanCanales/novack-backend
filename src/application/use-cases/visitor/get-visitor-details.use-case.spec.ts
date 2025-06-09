@@ -4,17 +4,13 @@ import { IVisitorRepository } from '../../../../domain/repositories/visitor.repo
 import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
 import { NotFoundException } from '@nestjs/common';
 import { Visitor } from '../../../../domain/entities/visitor.entity';
+import { Appointment } from '../../../../domain/entities/appointment.entity';
+import { Supplier } from '../../../../domain/entities/supplier.entity';
 
 // Mock IVisitorRepository
 const mockVisitorRepository = {
   findById: jest.fn(),
-  // Add other methods as needed by other use cases if creating a shared mock factory
-  create: jest.fn(),
-  save: jest.fn(),
-  findAll: jest.fn(),
-  findByEmail: jest.fn(),
-  findBySupplier: jest.fn(),
-  remove: jest.fn(),
+  // No need to mock other methods unless this specific use case starts using them
 };
 
 // Mock StructuredLoggerService
@@ -28,6 +24,7 @@ const mockLoggerService = {
 
 describe('GetVisitorDetailsUseCase', () => {
   let useCase: GetVisitorDetailsUseCase;
+  let repository: IVisitorRepository; // For easier access to mock in tests
 
   beforeEach(async () => {
     // Reset mocks before each test
@@ -45,28 +42,82 @@ describe('GetVisitorDetailsUseCase', () => {
     }).compile();
 
     useCase = module.get<GetVisitorDetailsUseCase>(GetVisitorDetailsUseCase);
+    repository = module.get<IVisitorRepository>(IVisitorRepository);
   });
 
   it('should be defined', () => {
     expect(useCase).toBeDefined();
   });
 
-  it('should return visitor details if found', async () => {
-    const mockVisitor = { id: 'some-uuid', name: 'Test Visitor' } as Visitor;
-    mockVisitorRepository.findById.mockResolvedValue(mockVisitor);
+  describe('execute', () => {
+    const visitorId = 'test-visitor-uuid';
+    // Define a more complete mock result, including potential relations
+    const mockVisitorResult: Visitor = {
+      id: visitorId,
+      name: 'Test Visitor',
+      email: 'test@example.com',
+      phone: '1234567890',
+      location: 'Test Location',
+      state: 'pendiente',
+      profile_image_url: null,
+      supplier_id: 'supplier-uuid',
+      created_at: new Date(),
+      updated_at: new Date(),
+      appointments: [{ id: 'appt-uuid', title: 'Test Appointment' } as Appointment],
+      supplier: { id: 'supplier-uuid', supplier_name: 'Test Supplier' } as Supplier,
+      card: null, // or mock a card if necessary
+    } as Visitor; // Cast as Visitor if only partial object is defined for simplicity
 
-    const result = await useCase.execute('some-uuid');
-    expect(result).toEqual(mockVisitor);
-    expect(mockVisitorRepository.findById).toHaveBeenCalledWith('some-uuid');
-    expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Attempting to fetch visitor details for id: some-uuid'), { visitorId: 'some-uuid' });
-    expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Successfully fetched visitor details for id: some-uuid'), { visitorId: 'some-uuid', visitorName: mockVisitor.name }); // Adjusted based on use case log
-  });
+    it('should return visitor details if visitor is found', async () => {
+      mockVisitorRepository.findById.mockResolvedValue(mockVisitorResult);
 
-  it('should throw NotFoundException if visitor not found', async () => {
-    mockVisitorRepository.findById.mockResolvedValue(null);
+      const result = await useCase.execute(visitorId);
 
-    await expect(useCase.execute('non-existent-uuid')).rejects.toThrow(NotFoundException);
-    expect(mockVisitorRepository.findById).toHaveBeenCalledWith('non-existent-uuid');
-    expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Visitor not found with id: non-existent-uuid'), { visitorId: 'non-existent-uuid' });
+      expect(result).toEqual(mockVisitorResult);
+      expect(repository.findById).toHaveBeenCalledWith(visitorId);
+      expect(mockLoggerService.log).toHaveBeenCalledWith(
+        `Attempting to fetch visitor details for id: ${visitorId}`,
+        { visitorId },
+      );
+      // The use case log currently doesn't include visitorName, so adjusting the expectation
+      expect(mockLoggerService.log).toHaveBeenCalledWith(
+        `Successfully fetched visitor details for id: ${visitorId}`,
+        { visitorId }, // Original use case logs only { visitorId } on success
+      );
+    });
+
+    it('should throw NotFoundException if visitor is not found', async () => {
+      mockVisitorRepository.findById.mockResolvedValue(null);
+
+      await expect(useCase.execute(visitorId)).rejects.toThrow(NotFoundException);
+      expect(repository.findById).toHaveBeenCalledWith(visitorId);
+      expect(mockLoggerService.warn).toHaveBeenCalledWith(
+        `Visitor not found with id: ${visitorId}`,
+        { visitorId },
+      );
+    });
+
+    it('should log an attempt to fetch visitor details', async () => {
+      // Ensure the mock doesn't cause an error during the call if findById throws
+      mockVisitorRepository.findById.mockResolvedValue(mockVisitorResult);
+      await useCase.execute(visitorId);
+      expect(mockLoggerService.log).toHaveBeenCalledWith(
+        `Attempting to fetch visitor details for id: ${visitorId}`,
+        { visitorId },
+      );
+    });
+
+    // Add more tests if there are specific conditions or edge cases for this use case
+    // For example, testing behavior if repository.findById throws an unexpected error
+    it('should propagate an unexpected error from repository', async () => {
+        const errorMessage = "Database connection error";
+        mockVisitorRepository.findById.mockRejectedValue(new Error(errorMessage));
+
+        await expect(useCase.execute(visitorId)).rejects.toThrow(Error);
+        await expect(useCase.execute(visitorId)).rejects.toThrow(errorMessage);
+        expect(repository.findById).toHaveBeenCalledWith(visitorId);
+        // Optionally, check if an error log was made by the use case if it had try/catch
+        // (current GetVisitorDetailsUseCase does not have try/catch for this, relies on global handler)
+    });
   });
 });
