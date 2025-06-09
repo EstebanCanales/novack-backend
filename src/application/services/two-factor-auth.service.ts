@@ -9,6 +9,7 @@ import { IEmployeeRepository } from '../../domain/repositories/employee.reposito
 // EmployeeCredentials is not directly used in method params or return types, so import might be optional if not used elsewhere.
 // import { EmployeeCredentials } from '../../domain/entities/employee-credentials.entity';
 import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service'; // Added import
+import { SmsService } from '../services/sms.service'; // Added import for SmsService
 
 @Injectable()
 export class TwoFactorAuthService {
@@ -18,6 +19,7 @@ export class TwoFactorAuthService {
     @Inject('IEmployeeRepository')
     private readonly employeeRepository: IEmployeeRepository,
     private readonly logger: StructuredLoggerService, // Added logger
+    private readonly smsService: SmsService, // Injected SmsService
   ) {
     this.logger.setContext('TwoFactorAuthService'); // Set context
   }
@@ -297,5 +299,122 @@ export class TwoFactorAuthService {
   async verify2FA(employeeId: string, token: string): Promise<boolean> {
     // this.logger.log('Validating 2FA token for login (via alias)', { employeeId });
     return this.validateTwoFactorToken(employeeId, token);
+  }
+
+  // --- SMS 2FA Methods ---
+
+  async initiateSmsVerification(employeeId: string, phoneNumber: string): Promise<void> {
+    this.logger.log('Initiating SMS phone verification', { employeeId, phoneNumber });
+    const employee = await this.employeeRepository.findById(employeeId);
+    if (!employee) {
+      this.logger.warn('Failed to initiate SMS verification: Employee not found', { employeeId });
+      throw new BadRequestException('Empleado no encontrado');
+    }
+
+    // It's assumed the phone number should be validated for format (e.g., E.164)
+    // before calling this method, or SmsService should handle it.
+    // For now, directly updating employee's phone.
+    await this.employeeRepository.update(employeeId, { phone: phoneNumber });
+    // Note: employeeRepository.update might not update relations or nested entities directly.
+    // If 'phone' is on the Employee entity directly, this is fine.
+
+    const otp = this.generateSixDigitCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+
+    await this.employeeRepository.updateCredentials(employeeId, {
+      sms_otp_code: otp,
+      sms_otp_code_expires_at: expiresAt,
+      phone_number_verified: false, // Explicitly set to false until verification
+    });
+
+    await this.smsService.sendOtp(phoneNumber, otp); // Assumes phoneNumber is E.164 formatted
+    this.logger.log('SMS OTP sent for phone verification', { employeeId, phoneNumber });
+  }
+
+  async verifySmsOtpForPhoneNumber(employeeId: string, otp: string): Promise<boolean> {
+    this.logger.log('Attempting to verify SMS OTP for phone number', { employeeId });
+    const employee = await this.employeeRepository.findByIdWithCredentials(employeeId); // Ensure this method exists and fetches credentials
+
+    if (!employee || !employee.credentials) {
+      this.logger.warn('SMS OTP verification failed: Employee or credentials not found', { employeeId });
+      throw new BadRequestException('Empleado o credenciales no encontradas.');
+    }
+
+    const { sms_otp_code: storedOtp, sms_otp_code_expires_at: expiry } = employee.credentials;
+
+    if (!storedOtp || !expiry) {
+      this.logger.warn('SMS OTP verification failed: No OTP pending or already verified', { employeeId });
+      throw new BadRequestException('No hay código OTP pendiente para verificación o ya ha sido verificado.');
+    }
+
+    if (expiry < new Date()) {
+      this.logger.warn('SMS OTP verification failed: OTP has expired', { employeeId });
+      // Clear the expired OTP
+      await this.employeeRepository.updateCredentials(employeeId, {
+        sms_otp_code: null,
+        sms_otp_code_expires_at: null,
+      });
+      throw new BadRequestException('El código OTP ha expirado.');
+    }
+
+    if (storedOtp !== otp) {
+      this.logger.warn('SMS OTP verification failed: Invalid OTP', { employeeId });
+      // Consider implementing attempt counting here to prevent brute-force attacks.
+      throw new BadRequestException('Código OTP inválido.');
+    }
+
+    // OTP is valid
+    await this.employeeRepository.updateCredentials(employeeId, {
+      phone_number_verified: true,
+      sms_otp_code: null,
+      sms_otp_code_expires_at: null,
+    });
+    this.logger.log('SMS OTP for phone number verified successfully', { employeeId });
+    return true;
+  }
+
+  async enableSmsTwoFactor(employeeId: string): Promise<boolean> {
+    this.logger.log('Attempting to enable SMS 2FA', { employeeId });
+    const employee = await this.employeeRepository.findByIdWithCredentials(employeeId);
+
+    if (!employee || !employee.credentials) {
+      this.logger.warn('Enable SMS 2FA failed: Employee or credentials not found', { employeeId });
+      throw new BadRequestException('Empleado o credenciales no encontradas.');
+    }
+
+    if (!employee.credentials.phone_number_verified) {
+      this.logger.warn('Enable SMS 2FA failed: Phone number not verified', { employeeId });
+      throw new BadRequestException('El número de teléfono debe ser verificado antes de habilitar SMS 2FA.');
+    }
+
+    await this.employeeRepository.updateCredentials(employeeId, {
+      is_sms_2fa_enabled: true
+    });
+    this.logger.log('SMS 2FA enabled successfully', { employeeId });
+    return true;
+  }
+
+  async disableSmsTwoFactor(employeeId: string): Promise<boolean> {
+    this.logger.log('Attempting to disable SMS 2FA', { employeeId });
+    const employee = await this.employeeRepository.findByIdWithCredentials(employeeId);
+
+    if (!employee || !employee.credentials) {
+      this.logger.warn('Disable SMS 2FA failed: Employee or credentials not found', { employeeId });
+      throw new BadRequestException('Empleado o credenciales no encontradas.');
+    }
+
+    if (!employee.credentials.is_sms_2fa_enabled) {
+      this.logger.warn('Disable SMS 2FA failed: SMS 2FA not currently enabled', { employeeId });
+      throw new BadRequestException('SMS 2FA no está habilitado actualmente.');
+    }
+
+    await this.employeeRepository.updateCredentials(employeeId, {
+      is_sms_2fa_enabled: false,
+      // Optionally clear sms_otp_code and expiry if needed upon disabling
+      // sms_otp_code: null,
+      // sms_otp_code_expires_at: null,
+    });
+    this.logger.log('SMS 2FA disabled successfully', { employeeId });
+    return true;
   }
 }
