@@ -1,9 +1,9 @@
 import { Injectable, Inject, BadRequestException } from '@nestjs/common';
-import { IEmployeeRepository } from '../../../domain/repositories/employee.repository.interface';
-import { Employee } from '../../../domain/entities';
-import { CreateEmployeeDto } from '../../dtos/employee/create-employee.dto';
+import { IEmployeeRepository } from 'src/domain/repositories/employee.repository.interface'; // Fixed path
+import { Employee } from 'src/domain/entities'; // Fixed path
+import { CreateEmployeeDto } from 'src/application/dtos/employee/create-employee.dto'; // Fixed path
 import * as bcrypt from 'bcrypt';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service'; // Fixed path
 
 @Injectable()
 export class CreateEmployeeUseCase {
@@ -16,7 +16,7 @@ export class CreateEmployeeUseCase {
   }
 
   async execute(createEmployeeDto: CreateEmployeeDto): Promise<Employee> {
-    this.logger.log('Attempting to create employee account', {
+    this.logger.log('Attempting to create employee account', undefined, {
       email: createEmployeeDto.email,
       supplierId: createEmployeeDto.supplier_id, // Ensure supplier_id is part of CreateEmployeeDto
     });
@@ -25,7 +25,7 @@ export class CreateEmployeeUseCase {
 
     const existingEmployee = await this.employeeRepository.findByEmail(employeeData.email);
     if (existingEmployee) {
-      this.logger.warn('Employee account creation failed: Email already exists', {
+      this.logger.warn('Employee account creation failed: Email already exists', undefined, {
         email: createEmployeeDto.email,
       });
       // Note: Original EmployeeService used BadRequestException here.
@@ -55,7 +55,7 @@ export class CreateEmployeeUseCase {
     // The repository's `create` method should be robust enough to handle this structure.
     const newEmployee = await this.employeeRepository.create(newEmployeeData as Partial<Employee>);
 
-    this.logger.log('Employee account created successfully', {
+    this.logger.log('Employee account created successfully', undefined, {
       employeeId: newEmployee.id,
       email: newEmployee.email,
     });

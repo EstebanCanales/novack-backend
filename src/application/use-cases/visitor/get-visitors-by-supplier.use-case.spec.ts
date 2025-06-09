@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GetVisitorsBySupplierUseCase } from './get-visitors-by-supplier.use-case';
-import { IVisitorRepository } from '../../../../domain/repositories/visitor.repository.interface';
-import { ISupplierRepository } from '../../../../domain/repositories/supplier.repository.interface';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
-import { Visitor } from '../../../../domain/entities/visitor.entity';
-import { Supplier } from '../../../../domain/entities/supplier.entity';
+import { IVisitorRepository } from 'src/domain/repositories/visitor.repository.interface'; // Fixed
+import { ISupplierRepository } from 'src/domain/repositories/supplier.repository.interface'; // Fixed
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service'; // Fixed
+import { Visitor } from 'src/domain/entities/visitor.entity'; // Fixed
+import { Supplier } from 'src/domain/entities/supplier.entity'; // Fixed
 import { NotFoundException } from '@nestjs/common';
 
 // --- Mocks ---
@@ -28,8 +28,16 @@ describe('GetVisitorsBySupplierUseCase', () => {
   const supplierId = 'supplier-uuid-for-visitors';
   const mockSupplier = { id: supplierId, supplier_name: 'Supplier For Visitors' } as Supplier;
   const mockVisitorsList: Visitor[] = [
-    { id: 'visitor-uuid-1', name: 'Visitor Alpha', supplier_id: supplierId } as Visitor,
-    { id: 'visitor-uuid-2', name: 'Visitor Beta', supplier_id: supplierId } as Visitor,
+    {
+      id: 'visitor-uuid-1', name: 'Visitor Alpha', supplier_id: supplierId,
+      email: 'alpha@example.com', phone: '111', location: 'Loc1', additional_info: {}, state: 'pendiente',
+      created_at: new Date(), updated_at: new Date(), appointments: [], card: null, supplier: mockSupplier, profile_image_url: null
+    } as Visitor,
+    {
+      id: 'visitor-uuid-2', name: 'Visitor Beta', supplier_id: supplierId,
+      email: 'beta@example.com', phone: '222', location: 'Loc2', additional_info: {}, state: 'en_progreso',
+      created_at: new Date(), updated_at: new Date(), appointments: [], card: null, supplier: mockSupplier, profile_image_url: null
+    } as Visitor,
   ];
 
   beforeEach(async () => {

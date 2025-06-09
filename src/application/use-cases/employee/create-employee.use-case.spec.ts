@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CreateEmployeeUseCase } from './create-employee.use-case';
-import { IEmployeeRepository } from '../../../../domain/repositories/employee.repository.interface';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
-import { Employee } from '../../../../domain/entities/employee.entity';
-import { CreateEmployeeDto } from '../../dtos/employee/create-employee.dto';
+import { IEmployeeRepository } from 'src/domain/repositories/employee.repository.interface'; // Fixed
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service'; // Fixed
+import { Employee } from 'src/domain/entities/employee.entity'; // Fixed
+import { CreateEmployeeDto } from 'src/application/dtos/employee/create-employee.dto'; // Fixed
 import { BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 

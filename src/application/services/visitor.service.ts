@@ -35,7 +35,7 @@ export class VisitorService {
   }
 
   async create(createVisitorDto: CreateVisitorDto) {
-    this.logger.log('Attempting to create visitor and appointment', {
+    this.logger.log('Attempting to create visitor and appointment', undefined, {
       visitorEmail: createVisitorDto.email,
       supplierId: createVisitorDto.supplier_id,
       appointmentTime: createVisitorDto.check_in_time,
@@ -82,7 +82,7 @@ export class VisitorService {
 
     await this.appointmentRepository.save(appointment);
 
-    this.logger.log('Visitor and appointment created successfully', {
+    this.logger.log('Visitor and appointment created successfully', undefined, {
       visitorId: savedVisitor.id,
       appointmentId: appointment.id,
       email: savedVisitor.email,
@@ -96,12 +96,12 @@ export class VisitorService {
         appointment.check_in_time,
         savedVisitor.location,
       );
-      this.logger.log('Visitor welcome email sent successfully', {
+      this.logger.log('Visitor welcome email sent successfully', undefined, {
         visitorId: savedVisitor.id,
         email: savedVisitor.email,
       });
     } catch (error) {
-      this.logger.warn('Failed to send visitor welcome email', {
+      this.logger.warn('Failed to send visitor welcome email', undefined, {
         visitorId: savedVisitor.id,
         email: savedVisitor.email,
         error: error.message,
@@ -114,17 +114,17 @@ export class VisitorService {
       const availableCards = await this.cardService.findAvailableCards();
       if (availableCards.length > 0) {
         await this.cardService.assignToVisitor(availableCards[0].id, savedVisitor.id);
-        this.logger.log('Card assigned to visitor', {
+        this.logger.log('Card assigned to visitor', undefined, {
           visitorId: savedVisitor.id,
           cardId: availableCards[0].id,
         });
       } else {
-        this.logger.warn('No available card to assign to visitor', {
+        this.logger.warn('No available card to assign to visitor', undefined, {
           visitorId: savedVisitor.id,
         });
       }
     } catch (error) {
-      this.logger.warn('Failed to assign card to visitor', {
+      this.logger.warn('Failed to assign card to visitor', undefined, {
         visitorId: savedVisitor.id,
         error: error.message,
       });
@@ -154,7 +154,7 @@ export class VisitorService {
   }
 
   async update(id: string, updateVisitorDto: UpdateVisitorDto) {
-    this.logger.log('Attempting to update visitor/appointment', { visitorId: id });
+    this.logger.log('Attempting to update visitor/appointment', undefined, { visitorId: id });
     const visitor = await this.findOne(id);
 
     if (!visitor.appointments || visitor.appointments.length === 0) {
@@ -205,15 +205,15 @@ export class VisitorService {
 
     await this.appointmentRepository.save(appointment);
 
-    this.logger.log('Visitor/appointment updated successfully', { visitorId: id });
+    this.logger.log('Visitor/appointment updated successfully', undefined, { visitorId: id });
     return this.findOne(id);
   }
 
   async remove(id: string) {
-    this.logger.log('Attempting to delete visitor', { visitorId: id });
+    this.logger.log('Attempting to delete visitor', undefined, { visitorId: id });
     const visitor = await this.findOne(id); // Ensures visitor exists before attempting removal
     await this.visitorRepository.remove(visitor);
-    this.logger.log('Visitor deleted successfully', { visitorId: id });
+    this.logger.log('Visitor deleted successfully', undefined, { visitorId: id });
     // The original method returns the result of remove, which might be void or the removed entity
     // For logging purposes, we've logged success. The actual return type is determined by TypeORM.
     // No explicit return here as the original was `return await this.visitorRepository.remove(visitor);`
@@ -224,7 +224,7 @@ export class VisitorService {
   }
 
   async checkOut(id: string) {
-    this.logger.log('Visitor check-out initiated', { visitorId: id });
+    this.logger.log('Visitor check-out initiated', undefined, { visitorId: id });
     const visitor = await this.findOne(id);
 
     if (visitor.state === 'completado') {
@@ -248,7 +248,7 @@ export class VisitorService {
     await this.appointmentRepository.save(appointment);
     const updatedVisitor = await this.visitorRepository.save(visitor);
 
-    this.logger.log('Visitor check-out completed successfully', {
+    this.logger.log('Visitor check-out completed successfully', undefined, {
       visitorId: updatedVisitor.id,
       appointmentId: appointment.id,
     });
@@ -256,7 +256,7 @@ export class VisitorService {
     // Liberar la tarjeta si tiene una asignada
     if (visitor.card) {
       await this.cardService.unassignFromVisitor(visitor.card.id);
-      this.logger.log('Card unassigned from visitor during check-out', {
+      this.logger.log('Card unassigned from visitor during check-out', undefined, {
         visitorId: visitor.id,
         cardId: visitor.card.id,
       });
@@ -271,12 +271,12 @@ export class VisitorService {
         appointment.check_out_time,
         visitor.location,
       );
-      this.logger.log('Visitor checkout email sent successfully', {
+      this.logger.log('Visitor checkout email sent successfully', undefined, {
         visitorId: visitor.id,
         email: visitor.email,
       });
     } catch (error) {
-      this.logger.warn('Failed to send visitor checkout email', {
+      this.logger.warn('Failed to send visitor checkout email', undefined, {
         visitorId: visitor.id,
         email: visitor.email,
         error: error.message,
@@ -314,7 +314,7 @@ export class VisitorService {
 
     visitor.profile_image_url = imageUrl;
     await this.visitorRepository.save(visitor);
-    this.logger.log('Visitor profile image URL updated', {
+    this.logger.log('Visitor profile image URL updated', undefined, {
       visitorId: id,
       newImageUrl: imageUrl,
     });

@@ -30,3 +30,5 @@ export interface IEmployeeRepository {
    */
   save(employee: Employee): Promise<Employee>;
 }
+
+export const IEmployeeRepository = Symbol('IEmployeeRepository');

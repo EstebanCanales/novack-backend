@@ -1,29 +1,39 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from '../auth.controller';
-import { AuthService } from '../../../application/services/auth.service';
+import { AuthService } from 'src/application/services/auth.service';
 import { UnauthorizedException } from '@nestjs/common';
-import { LoginDto } from '../../../domain/dtos/auth/login.dto';
-import { RefreshTokenDto } from '../../../domain/dtos/auth/refresh-token.dto';
-import { LogoutDto } from '../../../domain/dtos/auth/logout.dto';
+import { LoginDto, LoginSmsVerifyDto } from 'src/application/dtos/auth/login.dto'; // LoginSmsVerifyDto was also missing
+import { RefreshTokenDto } from 'src/application/dtos/auth/refresh-token.dto';
+import { LogoutDto } from 'src/application/dtos/auth/logout.dto';
+// Import AuthenticateEmployeeUseCase if it's a provider in the controller's actual module,
+// or if the controller directly depends on it (which it does).
+import { AuthenticateEmployeeUseCase } from 'src/application/use-cases/auth/authenticate-employee.use-case';
+
 
 describe('AuthController', () => {
   let controller: AuthController;
   let mockAuthService: Partial<AuthService>;
+  let mockAuthenticateEmployeeUseCase: Partial<AuthenticateEmployeeUseCase>;
+
 
   beforeEach(async () => {
     mockAuthService = {
       login: jest.fn(),
       refreshToken: jest.fn(),
       logout: jest.fn(),
+      verifySmsOtpAndLogin: jest.fn(), // Added for new endpoint
+    };
+
+    mockAuthenticateEmployeeUseCase = { // Mock for the use case
+        execute: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
-        {
-          provide: AuthService,
-          useValue: mockAuthService,
-        },
+        { provide: AuthService, useValue: mockAuthService },
+        // Provide the mock for AuthenticateEmployeeUseCase
+        { provide: AuthenticateEmployeeUseCase, useValue: mockAuthenticateEmployeeUseCase },
       ],
     }).compile();
 
@@ -123,12 +133,12 @@ describe('AuthController', () => {
     };
 
     it('should successfully logout', async () => {
-      (mockAuthService.logout as jest.Mock).mockResolvedValueOnce(true);
+      (mockAuthService.logout as jest.Mock).mockResolvedValueOnce({ message: 'Logged out successfully' });
 
       const result = await controller.logout(logoutDto);
 
-      expect(result).toEqual({ success: true });
+      expect(result).toEqual({ message: 'Logged out successfully' });
       expect(mockAuthService.logout).toHaveBeenCalledWith(logoutDto.refresh_token);
     });
   });
-}); 
+});

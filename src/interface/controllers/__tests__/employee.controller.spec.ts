@@ -15,7 +15,8 @@ describe('EmployeeController', () => {
   // Mock data
   const mockEmployee = {
     id: '123e4567-e89b-12d3-a456-426614174000',
-    name: 'Juan Pérez',
+    first_name: 'Juan',
+    last_name: 'Pérez',
     email: 'juan@example.com',
     is_creator: true,
     phone: '123456789',
@@ -52,7 +53,8 @@ describe('EmployeeController', () => {
   };
 
   const mockCreateEmployeeDto: CreateEmployeeDto = {
-    name: 'Juan Nuevo',
+    first_name: 'Juan',
+    last_name: 'Nuevo',
     email: 'juan.nuevo@example.com',
     password: 'password123',
     is_creator: false,
@@ -63,7 +65,8 @@ describe('EmployeeController', () => {
   };
 
   const mockUpdateEmployeeDto: UpdateEmployeeDto = {
-    name: 'Juan Actualizado',
+    first_name: 'Juan',
+    last_name: 'Actualizado',
     email: 'juan.actualizado@example.com',
     phone: '111222333',
     position: 'Senior Designer',
@@ -157,7 +160,8 @@ describe('EmployeeController', () => {
     it('should update an employee', async () => {
       const updatedEmployee = {
         ...mockEmployee,
-        name: mockUpdateEmployeeDto.name,
+        first_name: mockUpdateEmployeeDto.first_name,
+        last_name: mockUpdateEmployeeDto.last_name,
         email: mockUpdateEmployeeDto.email,
         phone: mockUpdateEmployeeDto.phone,
         position: mockUpdateEmployeeDto.position,

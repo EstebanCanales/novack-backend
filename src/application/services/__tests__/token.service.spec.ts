@@ -79,13 +79,21 @@ describe('TokenService', () => {
   });
 
   describe('generateTokens', () => {
-    const mockEmployee = {
+    const mockEmployee: Partial<Employee> = { // Using Partial<Employee> for mocks
       id: 'employee-id',
       email: 'test@example.com',
-      name: 'Test User',
+      first_name: 'Test',
+      last_name: 'User',
       is_creator: false,
-      supplier: { id: 'supplier-id' },
-    } as Employee;
+      supplier_id: 'supplier-id', // Added supplier_id
+      // supplier: { id: 'supplier-id' }, // Kept for now, but supplier_id is more direct
+      // Assuming credentials might be needed for role-based tokens or other checks
+      credentials: {
+        id: 'cred-id',
+        is_email_verified: true,
+        two_factor_enabled: false
+      } as any,
+    };
 
     const mockRequest = {
       headers: {
@@ -116,10 +124,19 @@ describe('TokenService', () => {
       employee_id: 'employee-id',
       is_revoked: false,
       expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24), // 1 day in future
-      employee: {
+      employee: { // Also update this nested mock
         id: 'employee-id',
         email: 'test@example.com',
-      } as Employee,
+        first_name: 'Test',
+        last_name: 'User',
+        is_creator: false,
+        supplier_id: 'supplier-id',
+        credentials: {
+          id: 'cred-id',
+          is_email_verified: true,
+          two_factor_enabled: false
+        } as any,
+      } as Partial<Employee>,
     };
 
     beforeEach(() => {

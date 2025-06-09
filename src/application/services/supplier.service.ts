@@ -25,7 +25,7 @@ export class SupplierService {
   }
 
   async create(createSupplierDto: CreateSupplierDto) {
-    this.logger.log('Attempting to create supplier', {
+    this.logger.log('Attempting to create supplier', undefined, {
       supplierName: createSupplierDto.supplier_name,
       contactEmail: createSupplierDto.contact_email,
     });
@@ -36,7 +36,7 @@ export class SupplierService {
     });
 
     if (existingSupplier) {
-      this.logger.warn('Supplier creation failed: Name already exists', {
+      this.logger.warn('Supplier creation failed: Name already exists', undefined, {
         supplierName: createSupplierDto.supplier_name,
       });
       throw new BadRequestException('Ya existe un proveedor con ese nombre');
@@ -69,7 +69,7 @@ export class SupplierService {
 
     await this.subscriptionRepository.save(subscription);
 
-    this.logger.log('Supplier created successfully', {
+    this.logger.log('Supplier created successfully', undefined, {
       supplierId: savedSupplier.id,
       supplierName: savedSupplier.supplier_name,
     });
@@ -91,7 +91,7 @@ export class SupplierService {
         });
 
         // console.log('Empleado creado exitosamente:', employee); // Replaced by structured log
-        this.logger.info('Creator employee for supplier created successfully', {
+        this.logger.log('Creator employee for supplier created successfully', undefined, { // Changed info to log
           supplierId: savedSupplier.id,
           employeeEmail: createSupplierDto.contact_email, // or employee.email
         });
@@ -105,13 +105,13 @@ export class SupplierService {
             temporalPassword,
           );
           // console.log('Email enviado exitosamente:', emailResult); // Replaced
-          this.logger.info('Supplier creation email sent successfully', {
+          this.logger.log('Supplier creation email sent successfully', undefined, { // Changed info to log
             supplierId: savedSupplier.id,
             contactEmail: createSupplierDto.contact_email,
           });
         } catch (emailError) {
           // console.error('Error al enviar el email:', emailError); // Replaced
-          this.logger.warn('Failed to send supplier creation email', {
+          this.logger.warn('Failed to send supplier creation email', undefined, {
             supplierId: savedSupplier.id,
             contactEmail: createSupplierDto.contact_email,
             error: emailError.message,
@@ -119,12 +119,14 @@ export class SupplierService {
           // No lanzamos el error para no revertir la creación del proveedor
         }
       } catch (error) {
-        this.logger.error(
-          'Supplier creation failed due to error creating employee',
-          {
+        this.logger.error( // error method signature: error(message: any, context?: string, trace?: string, ...meta: any[])
+          'Supplier creation failed due to error creating employee', // message
+          undefined, // context (use instance context)
+          error.stack, // trace
+          { // ...meta (as an object)
             supplierName: createSupplierDto.supplier_name,
             originalError: error.message,
-          },
+          }
         );
         // Si falla la creación del empleado, eliminar el proveedor
         await this.supplierRepository.remove(savedSupplier); // Also remove subscription?
@@ -157,7 +159,7 @@ export class SupplierService {
   }
 
   async update(id: string, updateSupplierDto: UpdateSupplierDto) {
-    this.logger.log('Attempting to update supplier', { supplierId: id });
+    this.logger.log('Attempting to update supplier', undefined, { supplierId: id });
     const supplier = await this.findOne(id); // findOne already logs if not found (via exception)
 
     if (
@@ -169,7 +171,7 @@ export class SupplierService {
       });
 
       if (existingSupplier && existingSupplier.id !== id) {
-        this.logger.warn('Supplier update failed: Name already exists', {
+        this.logger.warn('Supplier update failed: Name already exists', undefined, {
           supplierId: id,
           conflictingName: updateSupplierDto.supplier_name,
         });
@@ -218,19 +220,19 @@ export class SupplierService {
 
       await this.subscriptionRepository.save(supplier.subscription);
     }
-    this.logger.log('Supplier updated successfully', { supplierId: id });
+    this.logger.log('Supplier updated successfully', undefined, { supplierId: id });
     return this.findOne(id);
   }
 
   async remove(id: string) {
-    this.logger.log('Attempting to delete supplier', { supplierId: id });
+    this.logger.log('Attempting to delete supplier', undefined, { supplierId: id });
     const supplier = await this.findOne(id); // findOne will throw if not found
 
     // Verificar si hay empleados
     const employees = await this.employeeService.findBySupplier(id);
 
     if (employees.length > 0) {
-      this.logger.warn('Supplier deletion failed: Employees associated', {
+      this.logger.warn('Supplier deletion failed: Employees associated', undefined, {
         supplierId: id,
         employeeCount: employees.length,
       });
@@ -240,7 +242,7 @@ export class SupplierService {
     }
 
     await this.supplierRepository.remove(supplier);
-    this.logger.log('Supplier deleted successfully', { supplierId: id });
+    this.logger.log('Supplier deleted successfully', undefined, { supplierId: id });
     // Original method returns the result of remove, which might be void or the removed entity.
     // For logging, success is noted. TypeORM's remove usually returns void or the entity.
   }
@@ -255,7 +257,7 @@ export class SupplierService {
 
     supplier.profile_image_url = imageUrl; // Cambiar la URL de la imagen de perfil
     await this.supplierRepository.save(supplier);
-    this.logger.log('Supplier profile image URL updated', {
+    this.logger.log('Supplier profile image URL updated', undefined, {
       supplierId: id,
       newImageUrl: imageUrl,
     });

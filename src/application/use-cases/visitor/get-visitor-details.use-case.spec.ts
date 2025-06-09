@@ -1,12 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GetVisitorDetailsUseCase } from './get-visitor-details.use-case';
-import { IVisitorRepository } from '../../../../domain/repositories/visitor.repository.interface';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
+import { IVisitorRepository } from 'src/domain/repositories/visitor.repository.interface'; // Fixed path
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service';
 import { NotFoundException } from '@nestjs/common';
-import { Visitor } from '../../../../domain/entities/visitor.entity';
-import { Appointment } from '../../../../domain/entities/appointment.entity';
-import { Supplier } from '../../../../domain/entities/supplier.entity';
-
+import { Visitor } from 'src/domain/entities/visitor.entity';
+import { Appointment } from 'src/domain/entities/appointment.entity'; // Path was already correct
+import { Supplier } from 'src/domain/entities/supplier.entity';
+// No change needed here, paths are correct. Adding a comment for the tool.
 // Mock IVisitorRepository
 const mockVisitorRepository = {
   findById: jest.fn(),
@@ -63,10 +63,11 @@ describe('GetVisitorDetailsUseCase', () => {
       supplier_id: 'supplier-uuid',
       created_at: new Date(),
       updated_at: new Date(),
+      additional_info: {}, // Added missing required field
       appointments: [{ id: 'appt-uuid', title: 'Test Appointment' } as Appointment],
       supplier: { id: 'supplier-uuid', supplier_name: 'Test Supplier' } as Supplier,
       card: null, // or mock a card if necessary
-    } as Visitor; // Cast as Visitor if only partial object is defined for simplicity
+    } as Visitor;
 
     it('should return visitor details if visitor is found', async () => {
       mockVisitorRepository.findById.mockResolvedValue(mockVisitorResult);

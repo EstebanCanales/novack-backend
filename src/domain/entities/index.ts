@@ -18,3 +18,6 @@ export * from './chat-message.entity';
 
 // Entidades de seguridad y auditoría
 export * from './audit-log.entity';
+export * from './refresh-token.entity'; // Added export
+export * from './login-attempt.entity'; // Added export
+export * from './appointment.entity'; // Added export for Appointment

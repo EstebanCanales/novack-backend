@@ -1,11 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GetEmployeeByIdUseCase } from './get-employee-by-id.use-case';
-import { IEmployeeRepository } from '../../../../domain/repositories/employee.repository.interface';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
+import { IEmployeeRepository } from 'src/domain/repositories/employee.repository.interface'; // Fixed
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service'; // Fixed
 import { NotFoundException } from '@nestjs/common';
-import { Employee } from '../../../../domain/entities/employee.entity';
-import { Supplier } from '../../../../domain/entities/supplier.entity'; // For mock data
-import { EmployeeCredentials } from '../../../../domain/entities/employee-credentials.entity'; // For mock data
+import { Employee } from 'src/domain/entities/employee.entity'; // Fixed
+import { Supplier } from 'src/domain/entities/supplier.entity'; // Fixed
+import { EmployeeCredentials } from 'src/domain/entities/employee-credentials.entity'; // Fixed
 
 // Mock IEmployeeRepository
 const mockEmployeeRepository = {
@@ -35,12 +35,14 @@ describe('GetEmployeeByIdUseCase', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         GetEmployeeByIdUseCase,
+        // Use the actual IEmployeeRepository symbol (imported) as the provide token
         { provide: IEmployeeRepository, useValue: mockEmployeeRepository },
         { provide: StructuredLoggerService, useValue: mockLoggerService },
       ],
     }).compile();
 
     useCase = module.get<GetEmployeeByIdUseCase>(GetEmployeeByIdUseCase);
+    // Use the actual IEmployeeRepository symbol for getting the instance
     repository = module.get<IEmployeeRepository>(IEmployeeRepository);
     logger = module.get<StructuredLoggerService>(StructuredLoggerService);
   });
@@ -69,6 +71,8 @@ describe('GetEmployeeByIdUseCase', () => {
           employee_id: employeeId,
           is_email_verified: true
         } as EmployeeCredentials,
+      cards: [], // Added missing required field
+      chat_rooms: [], // Added missing required field
       // other necessary fields or relations
     } as Employee;
 

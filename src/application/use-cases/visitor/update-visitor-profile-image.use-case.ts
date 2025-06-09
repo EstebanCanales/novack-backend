@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { Visitor } from '../../../../domain/entities/visitor.entity';
-import { IVisitorRepository } from '../../../../domain/repositories/visitor.repository.interface';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
+import { Visitor } from 'src/domain/entities/visitor.entity'; // Fixed path
+import { IVisitorRepository } from 'src/domain/repositories/visitor.repository.interface'; // Fixed path
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service'; // Fixed path
 
 @Injectable()
 export class UpdateVisitorProfileImageUseCase {
@@ -14,7 +14,7 @@ export class UpdateVisitorProfileImageUseCase {
   }
 
   async execute(id: string, imageUrl: string): Promise<Visitor> {
-    this.logger.log(`Attempting to update profile image URL for visitor id: ${id}`, {
+    this.logger.log(`Attempting to update profile image URL for visitor id: ${id}`, undefined, {
       visitorId: id,
       // Avoid logging the full imageUrl if it could be very long or sensitive in some contexts,
       // or ensure it's appropriately handled by the logger's sanitization if any.
@@ -24,7 +24,7 @@ export class UpdateVisitorProfileImageUseCase {
 
     const visitor = await this.visitorRepository.findById(id);
     if (!visitor) {
-      this.logger.warn(`Visitor not found for profile image update with id: ${id}`, { visitorId: id });
+      this.logger.warn(`Visitor not found for profile image update with id: ${id}`, undefined, { visitorId: id });
       throw new NotFoundException(`Visitor with ID "${id}" not found`);
     }
 
@@ -34,7 +34,7 @@ export class UpdateVisitorProfileImageUseCase {
     // Depending on repository implementation, it might automatically include relations or just the updated visitor fields.
     const updatedVisitor = await this.visitorRepository.save(visitor);
 
-    this.logger.log(`Successfully updated profile image URL for visitor id: ${id}`, {
+    this.logger.log(`Successfully updated profile image URL for visitor id: ${id}`, undefined, {
       visitorId: id,
       updatedImageUrl: updatedVisitor.profile_image_url // Log the actual URL set
     });

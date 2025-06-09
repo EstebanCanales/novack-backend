@@ -5,8 +5,9 @@ import { LogTransportService } from './log-transport.service';
 import { AsyncLocalStorage } from 'async_hooks';
 
 // Mocks
+const mockConfigServiceGet = jest.fn();
 const mockConfigService = {
-  get: jest.fn(),
+  get: mockConfigServiceGet,
 };
 
 const mockLogTransportService = {
@@ -21,12 +22,12 @@ describe('StructuredLoggerService', () => {
 
   beforeEach(async () => {
     // Reset mocks for each test
-    mockConfigService.get.mockReset();
+    mockConfigServiceGet.mockReset(); // Reset the actual jest.fn()
     mockLogTransportService.sendLog.mockReset();
 
     // Default mock implementations
     // Default global log level to 'info'
-    mockConfigService.get.mockImplementation((key: string, defaultValue?: any) => {
+    mockConfigServiceGet.mockImplementation((key: string, defaultValue?: any) => {
       if (key === 'logging.level') return 'info';
       if (key === 'logging.contextLogLevels') return {};
       return defaultValue;
@@ -35,7 +36,8 @@ describe('StructuredLoggerService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StructuredLoggerService,
-        { provide: ConfigService, useValue: mockConfigService },
+        // Provide the mock with a more specific type or use as is if Test.createTestingModule handles it
+        { provide: ConfigService, useValue: mockConfigService as unknown as ConfigService },
         { provide: LogTransportService, useValue: mockLogTransportService },
       ],
     }).compile();
@@ -101,9 +103,9 @@ describe('StructuredLoggerService', () => {
         return undefined;
       });
       // Re-initialize service to pick up new config, or make logLevel dynamically configurable for tests
-      const debugService = new StructuredLoggerService(mockConfigService, mockLogTransportService);
+      const debugService = new StructuredLoggerService(mockConfigService as any, mockLogTransportService);
       debugService.debug('Debug message');
-      expect(mockLogTransportService.sendLog).toHaveBeenCalledTimes(1);
+      expect(mockLogTransportService.sendLog).toHaveBeenCalledTimes(1); // ensure sendLog reset from main service call
       expect(mockLogTransportService.sendLog).toHaveBeenCalledWith(expect.objectContaining({ level: 'debug', message: 'Debug message' }));
     });
 
@@ -130,7 +132,7 @@ describe('StructuredLoggerService', () => {
             if (key === 'logging.contextLogLevels') return {};
             return undefined;
           });
-        const verboseService = new StructuredLoggerService(mockConfigService, mockLogTransportService);
+        const verboseService = new StructuredLoggerService(mockConfigService as any, mockLogTransportService);
         verboseService.verbose('Verbose message');
         // Current implementation maps verbose to debug level check
         // If 'verbose' was a distinct level numerically lower than debug, this test would change
@@ -151,7 +153,23 @@ describe('StructuredLoggerService', () => {
         return undefined;
       });
       // Re-initialize service with new context-specific config
-      service = new StructuredLoggerService(mockConfigService, mockLogTransportService);
+      // This 'service' instance is the one from the main beforeEach,
+      // which is already created via Test.createTestingModule.
+      // The lines creating newService, debugService, verboseService are the ones needing the cast.
+      // This line re-assigns the main 'service' variable.
+      service = module.get<StructuredLoggerService>(StructuredLoggerService); // Get a fresh instance from the module configured with new mocks
+      // Or, if direct instantiation is necessary for some reason for 'service':
+      // service = new StructuredLoggerService(mockConfigService as any, mockLogTransportService);
+      // Let's ensure 'service' is re-instantiated if ConfigService state matters deeply for it.
+      // For this test, it's better to re-get from a reconfigured module or ensure static parts are reset.
+      // The static `initialized` flag in StructuredLoggerService means new ConfigService values won't be picked up
+      // by `new StructuredLoggerService()` after the first init unless that flag is reset.
+      // This test might be flawed due to static init.
+      // Forcing re-read of static config for test purposes:
+      (StructuredLoggerService as any).initialized = false;
+      service = new StructuredLoggerService(mockConfigService as any, mockLogTransportService);
+
+
     });
 
     it('should log "debug" for "SpecificContext" when its level is "debug" and global is "info"', () => {
@@ -197,7 +215,12 @@ describe('StructuredLoggerService', () => {
         // but if a log happens outside an ALS context where one might be expected,
         // the logger itself doesn't create it, CorrelationIdMiddleware does.
         // The 'no-correlation-id' is the default when ALS store is empty.
-        service.log('Message without explicit ALS correlation ID');
+
+      // Create a new service instance that doesn't have a specific context set by setContext()
+      // to test the 'Global' context fallback for an instance.
+      (StructuredLoggerService as any).initialized = false; // Ensure it re-reads config
+      const globalContextService = new StructuredLoggerService(mockConfigService as any, mockLogTransportService);
+      globalContextService.log('Message without explicit ALS correlation ID');
         expect(mockLogTransportService.sendLog).toHaveBeenCalledWith(
           expect.objectContaining({ correlationId: 'no-correlation-id' }) // Default when ALS is empty
         );

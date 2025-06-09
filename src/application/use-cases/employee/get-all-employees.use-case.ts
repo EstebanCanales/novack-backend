@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Employee } from '../../../../domain/entities/employee.entity';
-import { IEmployeeRepository } from '../../../../domain/repositories/employee.repository.interface';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
+import { Employee } from 'src/domain/entities/employee.entity'; // Fixed path
+import { IEmployeeRepository } from 'src/domain/repositories/employee.repository.interface'; // Fixed path
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service'; // Fixed path
 
 @Injectable()
 export class GetAllEmployeesUseCase {
@@ -22,7 +22,7 @@ export class GetAllEmployeesUseCase {
     // For now, a simple findAll is implemented.
     const employees = await this.employeeRepository.findAll();
 
-    this.logger.log(`Successfully fetched ${employees.length} employees.`, { count: employees.length });
+    this.logger.log(`Successfully fetched ${employees.length} employees.`, undefined, { count: employees.length });
     return employees;
   }
 }

@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DeleteVisitorUseCase } from './delete-visitor.use-case';
-import { IVisitorRepository } from '../../../../domain/repositories/visitor.repository.interface';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
+import { IVisitorRepository } from 'src/domain/repositories/visitor.repository.interface'; // Fixed
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service'; // Fixed
 import { NotFoundException } from '@nestjs/common';
-import { Visitor } from '../../../../domain/entities/visitor.entity';
+import { Visitor } from 'src/domain/entities/visitor.entity'; // Fixed
 
 // Mock IVisitorRepository
 const mockVisitorRepository = {

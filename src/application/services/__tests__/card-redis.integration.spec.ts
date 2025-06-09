@@ -3,10 +3,35 @@ import { CardService } from '../card.service';
 import { RedisDatabaseService } from '../../../infrastructure/database/redis/redis.database.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Card, CardLocation, Supplier, Visitor } from '../../../domain/entities';
+// StructuredLoggerService will be provided by LoggingModule
+import { LoggingModule } from 'src/infrastructure/logging/logging.module';
+import { ConfigModule, ConfigService } from '@nestjs/config'; // Import ConfigModule and ConfigService
+
+// Mock for REDIS_CLIENT_TYPE
+const mockRedisClient = {
+  get: jest.fn().mockResolvedValue(null),
+  set: jest.fn().mockResolvedValue('OK'),
+  del: jest.fn().mockResolvedValue(1),
+  scan: jest.fn().mockResolvedValue(['0', []]),
+  on: jest.fn(),
+  connect: jest.fn().mockResolvedValue(undefined),
+  quit: jest.fn().mockResolvedValue(undefined),
+  status: 'ready',
+  ping: jest.fn().mockResolvedValue('PONG'),
+  lPush: jest.fn(),
+  lTrim: jest.fn(),
+  expire: jest.fn(),
+  lRange: jest.fn(),
+  multi: jest.fn(() => ({ exec: jest.fn() })), // Simplified multi mock
+  geoAdd: jest.fn(),
+  geoSearchWith: jest.fn(),
+  // Add any other methods used by RedisDatabaseService if it becomes real
+};
+
 
 describe('CardService with Redis Integration', () => {
   let service: CardService;
-  let redisDatabaseService: RedisDatabaseService;
+  let redisDatabaseService: RedisDatabaseService; // This will be the real service
 
   // Mock del repositorio
   const mockCardRepository = {
@@ -23,20 +48,19 @@ describe('CardService with Redis Integration', () => {
     create: jest.fn(),
   };
 
-  // Mock del servicio de Redis
-  const mockRedisDatabaseService = {
-    saveCardLocation: jest.fn(),
-    getCardLocation: jest.fn(),
-    getNearbyCards: jest.fn(),
-  };
+  // RedisDatabaseService will be real, so its methods will be spied on if needed, not fully mocked here.
 
   beforeEach(async () => {
-    jest.clearAllMocks();
+    jest.clearAllMocks(); // Clear all mocks
 
-    // Setup del módulo de prueba
     const module: TestingModule = await Test.createTestingModule({
+      imports: [
+        LoggingModule, // Import LoggingModule to provide StructuredLoggerService
+        ConfigModule.forRoot({ isGlobal: true }), // Ensure ConfigService is available
+      ],
       providers: [
         CardService,
+        RedisDatabaseService, // Provide the real RedisDatabaseService
         {
           provide: getRepositoryToken(Card),
           useValue: mockCardRepository,
@@ -47,21 +71,31 @@ describe('CardService with Redis Integration', () => {
         },
         {
           provide: getRepositoryToken(Supplier),
-          useValue: {},
+          useValue: {}, // Keep mocks for unrelated repositories
         },
         {
           provide: getRepositoryToken(Visitor),
-          useValue: {},
+          useValue: {}, // Keep mocks for unrelated repositories
         },
         {
-          provide: RedisDatabaseService,
-          useValue: mockRedisDatabaseService,
+          provide: 'REDIS_CLIENT_TYPE', // Provide the mock Redis client for RedisDatabaseService
+          useValue: mockRedisClient,
         },
+        // ConfigService is provided by ConfigModule.forRoot()
+        // StructuredLoggerService is provided by LoggingModule
       ],
     }).compile();
 
     service = module.get<CardService>(CardService);
-    redisDatabaseService = module.get<RedisDatabaseService>(RedisDatabaseService);
+    redisDatabaseService = module.get<RedisDatabaseService>(RedisDatabaseService); // Get the real instance
+
+    // Reset specific mocks for redisDatabaseService if its methods are called directly in tests
+    // For example, if testing fallback logic when redis is down:
+    jest.spyOn(redisDatabaseService, 'saveCardLocation').mockResolvedValue(undefined);
+    jest.spyOn(redisDatabaseService, 'getCardLocation').mockResolvedValue(null);
+    jest.spyOn(redisDatabaseService, 'getNearbyCards').mockResolvedValue([]);
+
+
   });
 
   describe('recordLocation', () => {
@@ -97,7 +131,8 @@ describe('CardService with Redis Integration', () => {
         longitude,
         accuracy,
       });
-      mockRedisDatabaseService.saveCardLocation.mockResolvedValue(undefined);
+      // redisDatabaseService.saveCardLocation is already spied on and mocked via beforeEach
+      // mockRedisDatabaseService.saveCardLocation.mockResolvedValue(undefined); // No longer using mockRedisDatabaseService
 
       // Ejecutar
       const result = await service.recordLocation(cardId, latitude, longitude, accuracy);
@@ -121,7 +156,7 @@ describe('CardService with Redis Integration', () => {
         accuracy,
       });
       expect(mockLocationRepository.save).toHaveBeenCalledWith(mockLocation);
-      expect(mockRedisDatabaseService.saveCardLocation).toHaveBeenCalledWith(
+      expect(redisDatabaseService.saveCardLocation).toHaveBeenCalledWith( // Check the spy on the real service
         cardId,
         expect.objectContaining({
           id: mockLocation.id,
@@ -149,13 +184,16 @@ describe('CardService with Redis Integration', () => {
         card_number: 'CARD-123',
       };
 
-      mockRedisDatabaseService.getCardLocation.mockResolvedValue(cachedLocation);
+      // redisDatabaseService.getCardLocation is spied on
+      // mockRedisDatabaseService.getCardLocation.mockResolvedValue(cachedLocation); // No longer using mockRedisDatabaseService
+      (redisDatabaseService.getCardLocation as jest.Mock).mockResolvedValue(cachedLocation);
+
 
       // Ejecutar
       const result = await service.getLastLocation(cardId);
 
       // Verificar
-      expect(mockRedisDatabaseService.getCardLocation).toHaveBeenCalledWith(cardId);
+      expect(redisDatabaseService.getCardLocation).toHaveBeenCalledWith(cardId); // Check the spy
       expect(mockLocationRepository.findOne).not.toHaveBeenCalled(); // No debería buscar en DB
       expect(result).toEqual(cachedLocation);
     });
@@ -175,7 +213,8 @@ describe('CardService with Redis Integration', () => {
         timestamp: new Date(),
       };
 
-      mockRedisDatabaseService.getCardLocation.mockResolvedValue(null);
+      // mockRedisDatabaseService.getCardLocation.mockResolvedValue(null); // No longer using mockRedisDatabaseService
+      (redisDatabaseService.getCardLocation as jest.Mock).mockResolvedValue(null);
       mockLocationRepository.findOne.mockResolvedValue(dbLocation);
       mockCardRepository.findOne.mockResolvedValue(card);
 
@@ -183,9 +222,9 @@ describe('CardService with Redis Integration', () => {
       const result = await service.getLastLocation(cardId);
 
       // Verificar
-      expect(mockRedisDatabaseService.getCardLocation).toHaveBeenCalledWith(cardId);
+      expect(redisDatabaseService.getCardLocation).toHaveBeenCalledWith(cardId); // Check the spy
       expect(mockLocationRepository.findOne).toHaveBeenCalled();
-      expect(mockRedisDatabaseService.saveCardLocation).toHaveBeenCalledWith(
+      expect(redisDatabaseService.saveCardLocation).toHaveBeenCalledWith( // Check the spy
         cardId,
         expect.objectContaining({
           id: dbLocation.id,
@@ -220,13 +259,16 @@ describe('CardService with Redis Integration', () => {
         },
       ];
 
-      mockRedisDatabaseService.getNearbyCards.mockResolvedValue(nearbyCards);
+      // redisDatabaseService.getNearbyCards is spied on
+      // mockRedisDatabaseService.getNearbyCards.mockResolvedValue(nearbyCards); // No longer using mockRedisDatabaseService
+      (redisDatabaseService.getNearbyCards as jest.Mock).mockResolvedValue(nearbyCards);
+
 
       // Ejecutar
       const result = await service.getNearbyCards(latitude, longitude, radius);
 
       // Verificar
-      expect(mockRedisDatabaseService.getNearbyCards).toHaveBeenCalledWith(
+      expect(redisDatabaseService.getNearbyCards).toHaveBeenCalledWith( // Check the spy
         latitude,
         longitude,
         radius
@@ -255,14 +297,15 @@ describe('CardService with Redis Integration', () => {
         },
       ];
 
-      mockRedisDatabaseService.getNearbyCards.mockRejectedValue(new Error('Redis error'));
+      // mockRedisDatabaseService.getNearbyCards.mockRejectedValue(new Error('Redis error')); // No longer using mockRedisDatabaseService
+      (redisDatabaseService.getNearbyCards as jest.Mock).mockRejectedValue(new Error('Redis error'));
       mockCardRepository.find.mockResolvedValue(dbCards);
 
       // Ejecutar
       const result = await service.getNearbyCards(latitude, longitude, radius);
 
       // Verificar
-      expect(mockRedisDatabaseService.getNearbyCards).toHaveBeenCalledWith(
+      expect(redisDatabaseService.getNearbyCards).toHaveBeenCalledWith( // Check the spy
         latitude,
         longitude,
         radius

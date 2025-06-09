@@ -1,10 +1,10 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { IVisitorRepository } from '../../../../domain/repositories/visitor.repository.interface';
+import { IVisitorRepository } from 'src/domain/repositories/visitor.repository.interface'; // Fixed path
 // Assuming IAppointmentRepository might be needed if appointments need explicit deletion or check.
 // For this refactoring, we follow the original service's direct removal logic,
 // relying on ORM cascades or current business rules not requiring explicit appointment handling here.
-// import { IAppointmentRepository } from '../../../../domain/repositories/appointment.repository.interface';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
+// import { IAppointmentRepository } from 'src/domain/repositories/appointment.repository.interface'; // Fixed path if used
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service'; // Fixed path
 
 @Injectable()
 export class DeleteVisitorUseCase {
@@ -19,11 +19,11 @@ export class DeleteVisitorUseCase {
   }
 
   async execute(id: string): Promise<void> {
-    this.logger.log(`Attempting to delete visitor with id: ${id}`, { visitorId: id });
+    this.logger.log(`Attempting to delete visitor with id: ${id}`, undefined, { visitorId: id });
 
     const visitor = await this.visitorRepository.findById(id);
     if (!visitor) {
-      this.logger.warn(`Visitor not found for deletion with id: ${id}`, { visitorId: id });
+      this.logger.warn(`Visitor not found for deletion with id: ${id}`, undefined, { visitorId: id });
       throw new NotFoundException(`Visitor with ID "${id}" not found`);
     }
 
@@ -37,6 +37,6 @@ export class DeleteVisitorUseCase {
 
     await this.visitorRepository.remove(visitor);
 
-    this.logger.log(`Successfully deleted visitor with id: ${id}`, { visitorId: id });
+    this.logger.log(`Successfully deleted visitor with id: ${id}`, undefined, { visitorId: id });
   }
 }

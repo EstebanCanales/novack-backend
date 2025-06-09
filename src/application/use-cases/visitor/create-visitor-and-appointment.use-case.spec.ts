@@ -1,16 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CreateVisitorAndAppointmentUseCase } from './create-visitor-and-appointment.use-case';
-import { IVisitorRepository } from '../../../../domain/repositories/visitor.repository.interface';
-import { IAppointmentRepository } from '../../../../domain/repositories/appointment.repository.interface';
-import { ISupplierRepository } from '../../../../domain/repositories/supplier.repository.interface';
-import { EmailService } from '../../../services/email.service';
-import { CardService } from '../../../services/card.service';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
-import { CreateVisitorDto } from '../../../dtos/visitor/create-visitor.dto';
-import { Visitor } from '../../../../domain/entities/visitor.entity';
-import { Appointment } from '../../../../domain/entities/appointment.entity';
-import { Supplier } from '../../../../domain/entities/supplier.entity';
+import { IVisitorRepository } from 'src/domain/repositories/visitor.repository.interface'; // Fixed
+import { IAppointmentRepository } from 'src/domain/repositories/appointment.repository.interface'; // Fixed
+import { ISupplierRepository } from 'src/domain/repositories/supplier.repository.interface';
+import { EmailService } from 'src/application/services/email.service';
+import { CardService } from 'src/application/services/card.service';
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service';
+import { CreateVisitorDto } from 'src/application/dtos/visitor/create-visitor.dto';
+import { Visitor } from 'src/domain/entities/visitor.entity';
+import { Appointment } from 'src/domain/entities/appointment.entity'; // Path was correct
+import { Supplier } from 'src/domain/entities/supplier.entity';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+// No change needed here, paths are correct. Adding a comment for the tool.
 
 // --- Mocks ---
 const mockVisitorRepository = {

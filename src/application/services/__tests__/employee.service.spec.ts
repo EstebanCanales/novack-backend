@@ -66,6 +66,7 @@ describe('EmployeeService', () => {
       updateCredentials: jest.fn().mockResolvedValue(undefined),
       findByVerificationToken: jest.fn().mockResolvedValue(mockEmployee),
       findByResetToken: jest.fn().mockResolvedValue(mockEmployee),
+      save: jest.fn(), // Added save method
     };
 
     const module: TestingModule = await Test.createTestingModule({

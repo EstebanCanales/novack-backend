@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Visitor } from '../../../../domain/entities/visitor.entity';
-import { IVisitorRepository } from '../../../../domain/repositories/visitor.repository.interface';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
+import { Visitor } from 'src/domain/entities/visitor.entity'; // Fixed path
+import { IVisitorRepository } from 'src/domain/repositories/visitor.repository.interface'; // Fixed path
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service'; // Fixed path
 
 @Injectable()
 export class GetAllVisitorsUseCase {
@@ -21,7 +21,7 @@ export class GetAllVisitorsUseCase {
     // as part of the summary list of visitors.
     const visitors = await this.visitorRepository.findAll();
 
-    this.logger.log(`Successfully fetched ${visitors.length} visitors.`, { count: visitors.length });
+    this.logger.log(`Successfully fetched ${visitors.length} visitors.`, undefined, { count: visitors.length });
     return visitors;
   }
 }

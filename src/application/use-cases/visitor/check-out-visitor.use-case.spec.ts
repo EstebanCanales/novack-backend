@@ -1,14 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CheckOutVisitorUseCase } from './check-out-visitor.use-case';
-import { IVisitorRepository } from '../../../../domain/repositories/visitor.repository.interface';
-import { IAppointmentRepository } from '../../../../domain/repositories/appointment.repository.interface';
-import { CardService } from '../../../services/card.service';
-import { EmailService } from '../../../services/email.service';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
-import { Visitor } from '../../../../domain/entities/visitor.entity';
-import { Appointment } from '../../../../domain/entities/appointment.entity';
-import { Card } from '../../../../domain/entities/card.entity';
+import { IVisitorRepository } from 'src/domain/repositories/visitor.repository.interface'; // Fixed
+import { IAppointmentRepository } from 'src/domain/repositories/appointment.repository.interface'; // Fixed
+import { CardService } from 'src/application/services/card.service'; // Fixed
+import { EmailService } from 'src/application/services/email.service';
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service';
+import { Visitor } from 'src/domain/entities/visitor.entity';
+import { Appointment } from 'src/domain/entities/appointment.entity'; // Path was correct
+import { Card } from 'src/domain/entities/card.entity';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+// No change needed here, paths are correct. Adding a comment for the tool.
 
 // --- Mocks ---
 const mockVisitorRepository = {

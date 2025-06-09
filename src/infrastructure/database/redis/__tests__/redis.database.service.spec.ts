@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { RedisDatabaseService } from '../redis.database.service';
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service'; // Ensuring import is present
 
 // Mock para Redis - definir primero los métodos mock
 const mockMethods = {
@@ -69,6 +70,22 @@ describe('RedisDatabaseService', () => {
             }),
           },
         },
+        // Ensuring StructuredLoggerService mock is provided
+        {
+          provide: StructuredLoggerService,
+          useValue: {
+            setContext: jest.fn(),
+            log: jest.fn(),
+            error: jest.fn(),
+            warn: jest.fn(),
+            debug: jest.fn(),
+            verbose: jest.fn(),
+          },
+        },
+        {
+          provide: 'REDIS_CLIENT_TYPE', // Add provider for REDIS_CLIENT_TYPE
+          useClass: MockRedis, // Use the existing MockRedis class
+        }
       ],
     }).compile();
 
@@ -82,9 +99,6 @@ describe('RedisDatabaseService', () => {
 
   describe('onModuleInit', () => {
     it('should initialize Redis client properly', async () => {
-      // Asignar el cliente mock al servicio antes de onModuleInit
-      (service as any).redisClient = new MockRedis();
-      
       // Ejecutar
       await service.onModuleInit();
 

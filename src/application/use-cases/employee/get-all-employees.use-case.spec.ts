@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GetAllEmployeesUseCase } from './get-all-employees.use-case';
-import { IEmployeeRepository } from '../../../../domain/repositories/employee.repository.interface';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
-import { Employee } from '../../../../domain/entities/employee.entity';
+import { IEmployeeRepository } from 'src/domain/repositories/employee.repository.interface'; // Fixed
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service'; // Fixed
+import { Employee } from 'src/domain/entities/employee.entity'; // Fixed
 
 // Mock IEmployeeRepository
 const mockEmployeeRepository = {
@@ -59,6 +59,7 @@ describe('GetAllEmployeesUseCase', () => {
       expect(logger.log).toHaveBeenCalledWith('Attempting to fetch all employees.');
       expect(logger.log).toHaveBeenCalledWith(
         `Successfully fetched ${mockEmployeesResult.length} employees.`,
+        undefined, // Added undefined for context
         { count: mockEmployeesResult.length }
       );
     });
@@ -73,6 +74,7 @@ describe('GetAllEmployeesUseCase', () => {
       expect(logger.log).toHaveBeenCalledWith('Attempting to fetch all employees.');
       expect(logger.log).toHaveBeenCalledWith(
         'Successfully fetched 0 employees.',
+        undefined, // Added undefined for context
         { count: 0 }
       );
     });
@@ -80,6 +82,7 @@ describe('GetAllEmployeesUseCase', () => {
     it('should log an attempt to fetch all employees', async () => {
       mockEmployeeRepository.findAll.mockResolvedValue([]); // Outcome doesn't matter for this test
       await useCase.execute();
+      // For a single-argument call, the check is fine as is.
       expect(logger.log).toHaveBeenCalledWith('Attempting to fetch all employees.');
     });
 
