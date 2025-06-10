@@ -61,4 +61,33 @@ export class BackupCodeDto {
   @MinLength(8)
   @MaxLength(12)
   code: string;
-} 
+}
+
+// --- DTOs for SMS Based Two-Factor Authentication ---
+
+import { IsPhoneNumber } from 'class-validator'; // Ensure IsPhoneNumber is imported
+
+export class InitiateSmsVerificationDto {
+  @ApiProperty({
+    example: '+11234567890',
+    description: 'Phone number in E.164 format for SMS 2FA setup. Example: + followed by country code and number.'
+  })
+  @IsNotEmpty({ message: 'Phone number cannot be empty' })
+  @IsString()
+  // Note: @IsPhoneNumber decorator often requires a region code (e.g. @IsPhoneNumber('US'))
+  // or can be left as null to validate against general E.164 format.
+  // Ensure your validation pipe handles this correctly.
+  @IsPhoneNumber(null, { message: 'Invalid phone number format. Use E.164 format (e.g., +12223334444).' })
+  phone_number: string;
+}
+
+export class VerifySmsOtpDto {
+  @ApiProperty({
+    example: '123456',
+    description: 'The 6-digit OTP code sent via SMS'
+  })
+  @IsNotEmpty({ message: 'OTP code cannot be empty' })
+  @IsString()
+  @Length(6, 6, { message: 'OTP code must be 6 digits' })
+  otp: string;
+}

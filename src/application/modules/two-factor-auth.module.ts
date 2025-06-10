@@ -9,6 +9,7 @@ import { JwtConfigModule } from './jwt.module';
 import { AuthModule } from './auth.module';
 import { EmployeeRepository } from '../../infrastructure/repositories/employee.repository';
 import { TokenModule } from './token.module';
+import { SmsModule } from './sms.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { TokenModule } from './token.module';
     JwtConfigModule,
     forwardRef(() => AuthModule),
     TokenModule,
+    SmsModule,
   ],
   controllers: [TwoFactorAuthController],
   providers: [

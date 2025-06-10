@@ -37,6 +37,19 @@ export class EmployeeCredentials {
   @Column({ default: false })
   is_email_verified: boolean;
 
+  // SMS based 2FA fields
+  @Column({ default: false })
+  phone_number_verified: boolean;
+
+  @Column({ default: false })
+  is_sms_2fa_enabled: boolean;
+
+  @Column({ type: 'varchar', nullable: true, length: 10 }) // Adjust length as appropriate for OTP
+  sms_otp_code: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  sms_otp_code_expires_at: Date | null;
+
   @OneToOne(() => Employee, employee => employee.credentials, { onDelete: 'CASCADE' })
   @JoinColumn()
   employee: Employee;

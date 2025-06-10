@@ -7,14 +7,26 @@ import { BadRequestException } from '@nestjs/common';
 import { CreateVisitorDto, UpdateVisitorDto } from '../../dtos/visitor';
 import { CardService } from '../card.service';
 import { EmailService } from '../email.service';
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service';
 
-describe('VisitorService', () => {
+describe('VisitorService', () => { // Removed MOCK_LOGGER_PLACEHOLDER
   let service: VisitorService;
   let visitorRepository: Repository<Visitor>;
   let supplierRepository: Repository<Supplier>;
   let appointmentRepository: Repository<Appointment>;
   let cardService: CardService;
   let emailService: EmailService;
+  let logger: StructuredLoggerService; // Changed from mockLogger to logger for the instance variable
+
+  // Define the mock logger object here so it's in scope for Test.createTestingModule
+  const mockLoggerInstance = {
+    setContext: jest.fn(),
+    log: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    verbose: jest.fn(),
+  };
 
   // Mock data
   const mockSupplier = {
@@ -132,16 +144,23 @@ describe('VisitorService', () => {
           provide: EmailService,
           useValue: mockEmailService,
         },
+        {
+          provide: StructuredLoggerService,
+          useValue: mockLoggerInstance, // Use the defined mock instance
+        }
       ],
     }).compile();
 
     service = module.get<VisitorService>(VisitorService);
+    logger = module.get<StructuredLoggerService>(StructuredLoggerService);
     visitorRepository = module.get<Repository<Visitor>>(getRepositoryToken(Visitor));
     supplierRepository = module.get<Repository<Supplier>>(getRepositoryToken(Supplier));
     appointmentRepository = module.get<Repository<Appointment>>(getRepositoryToken(Appointment));
     cardService = module.get<CardService>(CardService);
     emailService = module.get<EmailService>(EmailService);
   });
+
+  // mockLogger object is now defined above as mockLoggerInstance
 
   it('should be defined', () => {
     expect(service).toBeDefined();
