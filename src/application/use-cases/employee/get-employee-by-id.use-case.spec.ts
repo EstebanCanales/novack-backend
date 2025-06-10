@@ -85,11 +85,13 @@ describe('GetEmployeeByIdUseCase', () => {
       expect(repository.findById).toHaveBeenCalledWith(employeeId);
       expect(logger.log).toHaveBeenCalledWith(
         `Attempting to fetch employee with id: ${employeeId}`,
+        undefined,
         { employeeId },
       );
       // The use case logs only employeeId on success
       expect(logger.log).toHaveBeenCalledWith(
         `Successfully fetched employee with id: ${employeeId}`,
+        undefined,
         { employeeId },
       );
     });
@@ -101,6 +103,7 @@ describe('GetEmployeeByIdUseCase', () => {
       expect(repository.findById).toHaveBeenCalledWith(employeeId);
       expect(logger.warn).toHaveBeenCalledWith(
         `Employee not found with id: ${employeeId}`,
+        undefined,
         { employeeId },
       );
     });
@@ -110,6 +113,7 @@ describe('GetEmployeeByIdUseCase', () => {
       await useCase.execute(employeeId);
       expect(logger.log).toHaveBeenCalledWith(
         `Attempting to fetch employee with id: ${employeeId}`,
+        undefined,
         { employeeId },
       );
     });

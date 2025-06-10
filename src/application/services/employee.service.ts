@@ -21,6 +21,7 @@ export class EmployeeService {
   async create(createEmployeeDto: CreateEmployeeDto): Promise<Employee> {
     this.logger.log(
       'Attempting to create employee account',
+      undefined,
       {
         email: createEmployeeDto.email,
         // Safely access supplier_id if it's part of the DTO structure
@@ -35,6 +36,7 @@ export class EmployeeService {
     if (existingEmployee) {
       this.logger.warn(
         'Employee account creation failed: Email already exists',
+        undefined,
         { email: createEmployeeDto.email },
       );
       throw new BadRequestException('Ya existe un empleado con ese email');
@@ -55,6 +57,7 @@ export class EmployeeService {
     
     this.logger.log(
       'Employee account created successfully',
+      undefined,
       { employeeId: newEmployee.id, email: newEmployee.email },
     );
     return newEmployee;
@@ -74,7 +77,7 @@ export class EmployeeService {
   }
 
   async update(id: string, updateEmployeeDto: UpdateEmployeeDto): Promise<Employee> {
-    this.logger.log('Attempting to update employee account', { employeeId: id });
+    this.logger.log('Attempting to update employee account', undefined, { employeeId: id });
     const { password, ...employeeData } = updateEmployeeDto;
     
     // Verificar si el empleado existe
@@ -82,7 +85,7 @@ export class EmployeeService {
     
     // Si hay una nueva contraseña, actualizarla
     if (password) {
-      this.logger.log('Employee password changed', { employeeId: id });
+      this.logger.log('Employee password changed', undefined, { employeeId: id });
       const hashedPassword = await bcrypt.hash(password, 10);
       await this.employeeRepository.updateCredentials(id, {
         password_hash: hashedPassword,
@@ -91,18 +94,18 @@ export class EmployeeService {
     
     // Actualizar los datos del empleado
     const updatedEmployee = await this.employeeRepository.update(id, employeeData);
-    this.logger.log('Employee account updated successfully', { employeeId: id });
+    this.logger.log('Employee account updated successfully', undefined, { employeeId: id });
     return updatedEmployee;
   }
 
   async remove(id: string): Promise<void> {
-    this.logger.log('Attempting to delete employee account', { employeeId: id });
+    this.logger.log('Attempting to delete employee account', undefined, { employeeId: id });
     // Verificar si el empleado existe
     await this.findOne(id); // findOne throws if not found, ensuring we only attempt to delete existing
     
     // Eliminar el empleado
     await this.employeeRepository.delete(id);
-    this.logger.log('Employee account deleted successfully', { employeeId: id });
+    this.logger.log('Employee account deleted successfully', undefined, { employeeId: id });
   }
 
   async findBySupplier(supplierId: string): Promise<Employee[]> {
@@ -123,7 +126,7 @@ export class EmployeeService {
       verification_token: null, // Assuming token is cleared upon verification
     });
     
-    this.logger.log('Email verified successfully', { employeeId: id });
+    this.logger.log('Email verified successfully', undefined, { employeeId: id });
     return this.employeeRepository.findById(id); // Return the updated employee
   }
 
@@ -138,6 +141,7 @@ export class EmployeeService {
 
     this.logger.log(
       'Profile image URL updated',
+      undefined,
       { employeeId: id, newImageUrl: imageUrl },
     );
     return updatedEmployee;

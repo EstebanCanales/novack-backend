@@ -7,6 +7,11 @@ import { TokenService } from '../token.service';
 import { Employee, RefreshToken } from '../../../domain/entities';
 import { UnauthorizedException } from '@nestjs/common';
 
+import { Supplier } from '../../../domain/entities/supplier.entity'; // Import Supplier
+import { EmployeeCredentials } from '../../../domain/entities/employee-credentials.entity'; // Import EmployeeCredentials
+import { Card } from '../../../domain/entities/card.entity'; // Import Card
+import { ChatRoom } from '../../../domain/entities/chat-room.entity'; // Import ChatRoom
+
 describe('TokenService', () => {
   let service: TokenService;
   let mockJwtService: Partial<JwtService>;
@@ -79,20 +84,43 @@ describe('TokenService', () => {
   });
 
   describe('generateTokens', () => {
-    const mockEmployee: Partial<Employee> = { // Using Partial<Employee> for mocks
+    const mockFullEmployee: Employee = {
       id: 'employee-id',
       email: 'test@example.com',
       first_name: 'Test',
       last_name: 'User',
       is_creator: false,
-      supplier_id: 'supplier-id', // Added supplier_id
-      // supplier: { id: 'supplier-id' }, // Kept for now, but supplier_id is more direct
-      // Assuming credentials might be needed for role-based tokens or other checks
+      supplier_id: 'supplier-id',
+      created_at: new Date(),
+      updated_at: new Date(),
+      phone: null,
+      position: null,
+      department: null,
+      profile_image_url: null,
+      supplier: { id: 'supplier-id', supplier_name: 'Mock Supplier' } as Supplier,
       credentials: {
         id: 'cred-id',
         is_email_verified: true,
-        two_factor_enabled: false
-      } as any,
+        two_factor_enabled: false,
+        // Add all required fields for EmployeeCredentials or ensure it is also fully mocked
+        password_hash: 'hashedpassword',
+        login_attempts: 0,
+        is_sms_2fa_enabled: false,
+        phone_number_verified: false,
+        locked_until: null,
+        last_login: null,
+        verification_token: null,
+        verification_token_expires_at: null,
+        reset_password_token: null,
+        reset_password_token_expires_at: null,
+        sms_otp_code: null,
+        sms_otp_code_expires_at: null,
+        backup_codes: [],
+        employee_id: 'employee-id', // if EmployeeCredentials requires it
+        employee: null // This would be circular, set to null or a minimal mock if absolutely needed
+      } as EmployeeCredentials,
+      cards: [],
+      chat_rooms: [],
     };
 
     const mockRequest = {
@@ -103,7 +131,10 @@ describe('TokenService', () => {
     } as any;
 
     it('should generate access and refresh tokens', async () => {
-      const result = await service.generateTokens(mockEmployee, mockRequest);
+      // Temporarily set employee to null to satisfy EmployeeCredentials.employee relation if it's strict
+      if (mockFullEmployee.credentials) (mockFullEmployee.credentials as any).employee = null;
+
+      const result = await service.generateTokens(mockFullEmployee, mockRequest);
 
       expect(result).toHaveProperty('access_token');
       expect(result).toHaveProperty('refresh_token');
@@ -124,19 +155,43 @@ describe('TokenService', () => {
       employee_id: 'employee-id',
       is_revoked: false,
       expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24), // 1 day in future
-      employee: { // Also update this nested mock
+      employee: {
         id: 'employee-id',
         email: 'test@example.com',
         first_name: 'Test',
         last_name: 'User',
         is_creator: false,
         supplier_id: 'supplier-id',
+        created_at: new Date(),
+        updated_at: new Date(),
+        phone: null,
+        position: null,
+        department: null,
+        profile_image_url: null,
+        supplier: { id: 'supplier-id', supplier_name: 'Mock Supplier' } as Supplier,
         credentials: {
           id: 'cred-id',
           is_email_verified: true,
-          two_factor_enabled: false
-        } as any,
-      } as Partial<Employee>,
+          two_factor_enabled: false,
+          password_hash: 'hashedpassword',
+          login_attempts: 0,
+          is_sms_2fa_enabled: false,
+          phone_number_verified: false,
+          locked_until: null,
+          last_login: null,
+          verification_token: null,
+          verification_token_expires_at: null,
+          reset_password_token: null,
+          reset_password_token_expires_at: null,
+          sms_otp_code: null,
+          sms_otp_code_expires_at: null,
+          backup_codes: [],
+          employee_id: 'employee-id',
+          employee: null
+        } as EmployeeCredentials,
+        cards: [],
+        chat_rooms: [],
+      } as Employee, // Now a full Employee
     };
 
     beforeEach(() => {

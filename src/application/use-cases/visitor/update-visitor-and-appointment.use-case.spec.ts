@@ -211,18 +211,22 @@ describe('UpdateVisitorAndAppointmentUseCase', () => {
 
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         `Attempting to update visitor and associated appointment`,
+        undefined,
         { visitorId: visitorId, updateData: updateDto }
       );
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         'Visitor entity updated successfully',
+        undefined,
         { visitorId: visitorId }
       );
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         'Associated appointment updated successfully',
+        undefined,
         { appointmentId: mockExistingAppointment.id, visitorId: visitorId }
       );
        expect(mockLoggerService.log).toHaveBeenCalledWith(
         'Successfully updated visitor and appointment details.',
+        undefined,
         { visitorId: visitorId }
       );
     });
@@ -230,7 +234,7 @@ describe('UpdateVisitorAndAppointmentUseCase', () => {
     it('should throw NotFoundException if visitor not found initially', async () => {
       mockVisitorRepository.findById.mockReset().mockResolvedValue(null); // Only for the first call
       await expect(useCase.execute(visitorId, updateDto)).rejects.toThrow(NotFoundException);
-      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Visitor not found for update'), {visitorId});
+      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Visitor not found for update'), undefined, {visitorId});
     });
 
     it('should throw BadRequestException if visitor has no appointments', async () => {
@@ -238,7 +242,7 @@ describe('UpdateVisitorAndAppointmentUseCase', () => {
       mockVisitorRepository.findById.mockReset().mockResolvedValue(visitorWithoutAppointments);
 
       await expect(useCase.execute(visitorId, updateDto)).rejects.toThrow(BadRequestException);
-      expect(mockLoggerService.warn).toHaveBeenCalledWith('Visitor has no associated appointments to update', { visitorId });
+      expect(mockLoggerService.warn).toHaveBeenCalledWith('Visitor has no associated appointments to update', undefined, { visitorId });
     });
 
     it('should throw NotFoundException if associated appointment not found', async () => {
@@ -248,6 +252,7 @@ describe('UpdateVisitorAndAppointmentUseCase', () => {
       await expect(useCase.execute(visitorId, updateDto)).rejects.toThrow(NotFoundException);
       expect(mockLoggerService.error).toHaveBeenCalledWith(
         'Associated appointment not found during update despite being listed under visitor.',
+        undefined,
         { visitorId, appointmentId: mockExistingAppointment.id }
       );
     });
@@ -260,6 +265,7 @@ describe('UpdateVisitorAndAppointmentUseCase', () => {
       await expect(useCase.execute(visitorId, updateDto)).rejects.toThrow(BadRequestException);
       expect(mockLoggerService.warn).toHaveBeenCalledWith(
         'Supplier not found during visitor update',
+        undefined,
         { supplierId: updateDto.supplier_id, visitorId }
       );
     });
@@ -277,6 +283,7 @@ describe('UpdateVisitorAndAppointmentUseCase', () => {
         await expect(useCase.execute(visitorId, invalidDateDto)).rejects.toThrow(BadRequestException);
         expect(mockLoggerService.warn).toHaveBeenCalledWith(
             'Validation failed: Check-out time must be after check-in time during update.',
+            undefined,
             expect.objectContaining({}) // Check specific dates if needed
         );
     });
@@ -323,6 +330,7 @@ describe('UpdateVisitorAndAppointmentUseCase', () => {
       await expect(useCase.execute(visitorId, updateDto)).rejects.toThrow(NotFoundException);
       expect(mockLoggerService.error).toHaveBeenCalledWith(
         'Failed to re-fetch visitor after update, though update operations were successful.',
+        undefined,
         { visitorId }
       );
     });

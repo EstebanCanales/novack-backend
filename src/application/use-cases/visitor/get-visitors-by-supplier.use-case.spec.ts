@@ -73,10 +73,12 @@ describe('GetVisitorsBySupplierUseCase', () => {
       expect(visitorRepo.findBySupplier).toHaveBeenCalledWith(supplierId);
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         `Attempting to fetch visitors for supplier id: ${supplierId}`,
+        undefined,
         { supplierId },
       );
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         `Successfully fetched ${mockVisitorsList.length} visitors for supplier id: ${supplierId}`,
+        undefined,
         { supplierId, count: mockVisitorsList.length },
       );
     });
@@ -92,6 +94,7 @@ describe('GetVisitorsBySupplierUseCase', () => {
       expect(visitorRepo.findBySupplier).toHaveBeenCalledWith(supplierId);
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         `Successfully fetched 0 visitors for supplier id: ${supplierId}`,
+        undefined,
         { supplierId, count: 0 },
       );
     });
@@ -105,6 +108,7 @@ describe('GetVisitorsBySupplierUseCase', () => {
       expect(mockLoggerService.warn).toHaveBeenCalledWith(
         // The use case log message is "Supplier not found when attempting to fetch its visitors: ${supplierId}"
         `Supplier not found when attempting to fetch its visitors: ${supplierId}`,
+        undefined,
         { supplierId },
       );
     });

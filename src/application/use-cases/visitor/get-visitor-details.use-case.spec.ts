@@ -78,11 +78,13 @@ describe('GetVisitorDetailsUseCase', () => {
       expect(repository.findById).toHaveBeenCalledWith(visitorId);
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         `Attempting to fetch visitor details for id: ${visitorId}`,
+        undefined,
         { visitorId },
       );
       // The use case log currently doesn't include visitorName, so adjusting the expectation
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         `Successfully fetched visitor details for id: ${visitorId}`,
+        undefined,
         { visitorId }, // Original use case logs only { visitorId } on success
       );
     });
@@ -94,6 +96,7 @@ describe('GetVisitorDetailsUseCase', () => {
       expect(repository.findById).toHaveBeenCalledWith(visitorId);
       expect(mockLoggerService.warn).toHaveBeenCalledWith(
         `Visitor not found with id: ${visitorId}`,
+        undefined,
         { visitorId },
       );
     });
@@ -104,6 +107,7 @@ describe('GetVisitorDetailsUseCase', () => {
       await useCase.execute(visitorId);
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         `Attempting to fetch visitor details for id: ${visitorId}`,
+        undefined,
         { visitorId },
       );
     });

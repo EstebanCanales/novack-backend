@@ -193,22 +193,27 @@ describe('CreateVisitorAndAppointmentUseCase', () => {
 
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         'Attempting to create visitor and appointment',
+        undefined,
         expect.objectContaining({ visitorEmail: createVisitorDto.email })
       );
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         'Visitor entity created successfully',
+        undefined,
         expect.objectContaining({ visitorId: mockSavedVisitor.id })
       );
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         'Appointment entity created successfully',
+        undefined,
         expect.objectContaining({ appointmentId: mockSavedAppointment.id })
       );
       expect(mockLoggerService.log).toHaveBeenCalledWith(
-        'Visitor welcome email dispatch requested', // Updated log message from use case
+        'Visitor welcome email dispatch requested',
+        undefined,
         expect.objectContaining({ visitorId: mockSavedVisitor.id })
       );
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         'Card assigned to visitor',
+        undefined,
         expect.objectContaining({ visitorId: mockSavedVisitor.id, cardId: 'card-uuid'})
       );
     });
@@ -218,6 +223,7 @@ describe('CreateVisitorAndAppointmentUseCase', () => {
       await expect(useCase.execute(createVisitorDto)).rejects.toThrow(BadRequestException);
       expect(mockLoggerService.warn).toHaveBeenCalledWith(
         'Supplier not found for visitor creation',
+        undefined,
         { supplierId: createVisitorDto.supplier_id }
       );
     });
@@ -229,6 +235,7 @@ describe('CreateVisitorAndAppointmentUseCase', () => {
         await expect(useCase.execute(invalidDto)).rejects.toThrow(BadRequestException);
         expect(mockLoggerService.warn).toHaveBeenCalledWith(
             'Validation failed: Check-out time must be after check-in time',
+            undefined,
             expect.objectContaining({ check_in_time: invalidDto.check_in_time, check_out_time: invalidDto.check_out_time })
         );
     });
@@ -240,6 +247,7 @@ describe('CreateVisitorAndAppointmentUseCase', () => {
 
       expect(mockLoggerService.warn).toHaveBeenCalledWith(
         'Failed to send visitor welcome email',
+        undefined,
         expect.objectContaining({ visitorId: mockSavedVisitor.id, error: 'Email system down' })
       );
       expect(visitorRepo.findById).toHaveBeenCalledWith(mockSavedVisitor.id); // Ensure it still tries to return the visitor
@@ -252,6 +260,7 @@ describe('CreateVisitorAndAppointmentUseCase', () => {
 
       expect(mockLoggerService.warn).toHaveBeenCalledWith(
         'Failed to assign card to visitor',
+        undefined,
         expect.objectContaining({ visitorId: mockSavedVisitor.id, error: 'Card service connection error' })
       );
       expect(cardService.assignToVisitor).not.toHaveBeenCalled();
@@ -265,6 +274,7 @@ describe('CreateVisitorAndAppointmentUseCase', () => {
 
       expect(mockLoggerService.warn).toHaveBeenCalledWith(
         'No available card to assign to visitor',
+        undefined,
         { visitorId: mockSavedVisitor.id }
       );
       expect(cardService.assignToVisitor).not.toHaveBeenCalled();
@@ -279,6 +289,7 @@ describe('CreateVisitorAndAppointmentUseCase', () => {
 
       expect(mockLoggerService.warn).toHaveBeenCalledWith(
         'Failed to assign card to visitor',
+        undefined,
         expect.objectContaining({ visitorId: mockSavedVisitor.id, error: 'Card already assigned or inactive' })
       );
       expect(visitorRepo.findById).toHaveBeenCalledWith(mockSavedVisitor.id);
@@ -292,6 +303,7 @@ describe('CreateVisitorAndAppointmentUseCase', () => {
       await expect(useCase.execute(createVisitorDto)).rejects.toThrow(NotFoundException);
       expect(mockLoggerService.error).toHaveBeenCalledWith(
         'Failed to re-fetch visitor after creation, though creation was successful.',
+        undefined,
         { visitorId: mockSavedVisitor.id }
       );
     });

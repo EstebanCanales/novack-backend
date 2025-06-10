@@ -1,8 +1,8 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { Employee } from '../../../../domain/entities/employee.entity';
-import { IEmployeeRepository } from '../../../../domain/repositories/employee.repository.interface';
-import { UpdateEmployeeDto } from '../../dtos/employee/update-employee.dto';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
+import { Employee } from 'src/domain/entities/employee.entity';
+import { IEmployeeRepository } from 'src/domain/repositories/employee.repository.interface';
+import { UpdateEmployeeDto } from 'src/application/dtos/employee/update-employee.dto';
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -16,7 +16,7 @@ export class UpdateEmployeeUseCase {
   }
 
   async execute(id: string, updateEmployeeDto: UpdateEmployeeDto): Promise<Employee> {
-    this.logger.log(`Attempting to update employee account for id: ${id}`, {
+    this.logger.log(`Attempting to update employee account for id: ${id}`, undefined, {
       employeeId: id,
       // Avoid logging entire DTO if it contains sensitive data like password
       updateData: Object.keys(updateEmployeeDto)
@@ -30,13 +30,13 @@ export class UpdateEmployeeUseCase {
     // For just checking existence, a lighter find might be okay, but findById often implies full entity.
     const existingEmployee = await this.employeeRepository.findById(id);
     if (!existingEmployee) {
-      this.logger.warn(`Employee not found for update with id: ${id}`, { employeeId: id });
+      this.logger.warn(`Employee not found for update with id: ${id}`, undefined, { employeeId: id });
       throw new NotFoundException(`Employee with ID "${id}" not found`);
     }
 
     // 2. Handle password update if provided
     if (password) {
-      this.logger.log(`Password change requested for employee id: ${id}`, { employeeId: id });
+      this.logger.log(`Password change requested for employee id: ${id}`, undefined, { employeeId: id });
       const saltRounds = 10; // Consider making configurable via ConfigService
       const hashedPassword = await bcrypt.hash(password, saltRounds);
 
@@ -44,15 +44,15 @@ export class UpdateEmployeeUseCase {
       await this.employeeRepository.updateCredentials(id, {
         password_hash: hashedPassword
       });
-      this.logger.log(`Password updated for employee id: ${id}`, { employeeId: id });
+      this.logger.log(`Password updated for employee id: ${id}`, undefined, { employeeId: id });
     }
 
     // 3. Handle email uniqueness if email is being changed
     if (employeeDataToUpdate.email && employeeDataToUpdate.email !== existingEmployee.email) {
-        this.logger.log(`Email change requested for employee id: ${id}. Verifying uniqueness.`, { employeeId: id, newEmail: employeeDataToUpdate.email });
+        this.logger.log(`Email change requested for employee id: ${id}. Verifying uniqueness.`, undefined, { employeeId: id, newEmail: employeeDataToUpdate.email });
         const employeeWithNewEmail = await this.employeeRepository.findByEmail(employeeDataToUpdate.email);
         if (employeeWithNewEmail && employeeWithNewEmail.id !== id) {
-            this.logger.warn('Employee update failed: New email already exists for another employee.', {
+            this.logger.warn('Employee update failed: New email already exists for another employee.', undefined, {
                 employeeId: id,
                 newEmail: employeeDataToUpdate.email,
                 conflictingEmployeeId: employeeWithNewEmail.id
@@ -71,22 +71,22 @@ export class UpdateEmployeeUseCase {
     // The repository's update method should only affect columns on the Employee table.
     if (Object.keys(employeeDataToUpdate).length > 0) {
         await this.employeeRepository.update(id, employeeDataToUpdate as Partial<Employee>);
-        this.logger.log(`Employee core data updated for id: ${id}`, { employeeId: id, updatedFields: Object.keys(employeeDataToUpdate) });
+        this.logger.log(`Employee core data updated for id: ${id}`, undefined, { employeeId: id, updatedFields: Object.keys(employeeDataToUpdate) });
     } else if (!password) {
-        this.logger.log(`No data provided for update for employee id: ${id} (excluding password)`, { employeeId: id });
+        this.logger.log(`No data provided for update for employee id: ${id} (excluding password)`, undefined, { employeeId: id });
         // No actual update to core fields if only password was in DTO and it was handled, or DTO was empty.
     }
 
     // 5. Re-fetch the entity to return the latest state
     const resultEmployee = await this.employeeRepository.findById(id);
     if (!resultEmployee) {
-        this.logger.error(`Failed to re-fetch employee after update for id: ${id}. This indicates a critical issue.`, { employeeId: id });
+        this.logger.error(`Failed to re-fetch employee after update for id: ${id}. This indicates a critical issue.`, undefined, { employeeId: id });
         // This case should ideally not be reached if the 'id' is valid and the employee existed.
         // It might indicate a race condition or an issue with the update/find process.
         throw new NotFoundException(`Employee with ID "${id}" could not be found after update operations.`);
     }
 
-    this.logger.log(`Employee account updated successfully and re-fetched for id: ${id}`, { employeeId: id });
+    this.logger.log(`Employee account updated successfully and re-fetched for id: ${id}`, undefined, { employeeId: id });
     return resultEmployee;
   }
 }

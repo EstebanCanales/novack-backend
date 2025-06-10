@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { IEmployeeRepository } from '../../../../domain/repositories/employee.repository.interface';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
+import { IEmployeeRepository } from 'src/domain/repositories/employee.repository.interface';
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service';
 
 @Injectable()
 export class DeleteEmployeeUseCase {

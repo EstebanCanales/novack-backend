@@ -63,6 +63,7 @@ describe('GetAllVisitorsUseCase', () => {
       expect(mockLoggerService.log).toHaveBeenCalledWith('Attempting to fetch all visitors.');
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         `Successfully fetched ${mockVisitorsResult.length} visitors.`,
+        undefined,
         { count: mockVisitorsResult.length }
       );
     });
@@ -77,6 +78,7 @@ describe('GetAllVisitorsUseCase', () => {
       expect(mockLoggerService.log).toHaveBeenCalledWith('Attempting to fetch all visitors.');
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         'Successfully fetched 0 visitors.',
+        undefined,
         { count: 0 }
       );
     });

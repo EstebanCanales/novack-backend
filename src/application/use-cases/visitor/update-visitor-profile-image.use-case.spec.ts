@@ -102,11 +102,13 @@ describe('UpdateVisitorProfileImageUseCase', () => {
       expect(result.profile_image_url).toEqual(newImageUrl);
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         `Attempting to update profile image URL for visitor id: ${visitorId}`,
+        undefined,
         { visitorId, newImageUrl },
       );
       // The use case logs `updatedImageUrl: updatedVisitor.profile_image_url`
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         `Successfully updated profile image URL for visitor id: ${visitorId}`,
+        undefined,
         { visitorId, updatedImageUrl: newImageUrl },
       );
     });
@@ -119,6 +121,7 @@ describe('UpdateVisitorProfileImageUseCase', () => {
       expect(repository.save).not.toHaveBeenCalled();
       expect(mockLoggerService.warn).toHaveBeenCalledWith(
         `Visitor not found for profile image update with id: ${visitorId}`,
+        undefined,
         { visitorId },
       );
     });

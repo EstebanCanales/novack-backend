@@ -1,14 +1,14 @@
 import { Inject, Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { Visitor } from '../../../../domain/entities/visitor.entity';
-import { Appointment } from '../../../../domain/entities/appointment.entity';
-import { Supplier } from '../../../../domain/entities/supplier.entity';
-import { IVisitorRepository } from '../../../../domain/repositories/visitor.repository.interface';
-import { IAppointmentRepository } from '../../../../domain/repositories/appointment.repository.interface';
-import { ISupplierRepository } from '../../../../domain/repositories/supplier.repository.interface';
-import { EmailService } from '../../../services/email.service';
-import { CardService } from '../../../services/card.service';
-import { CreateVisitorDto } from '../../../dtos/visitor/create-visitor.dto'; // Assuming DTO path
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
+import { Visitor } from 'src/domain/entities/visitor.entity';
+import { Appointment } from 'src/domain/entities/appointment.entity';
+import { Supplier } from 'src/domain/entities/supplier.entity';
+import { IVisitorRepository } from 'src/domain/repositories/visitor.repository.interface';
+import { IAppointmentRepository } from 'src/domain/repositories/appointment.repository.interface';
+import { ISupplierRepository } from 'src/domain/repositories/supplier.repository.interface';
+import { EmailService } from 'src/application/services/email.service';
+import { CardService } from 'src/application/services/card.service';
+import { CreateVisitorDto } from 'src/application/dtos/visitor/create-visitor.dto';
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service';
 
 @Injectable()
 export class CreateVisitorAndAppointmentUseCase {
@@ -29,7 +29,7 @@ export class CreateVisitorAndAppointmentUseCase {
   private validateDates(check_in_time: Date, check_out_time?: Date): void {
     if (check_out_time) {
       if (new Date(check_out_time) <= new Date(check_in_time)) {
-        this.logger.warn('Validation failed: Check-out time must be after check-in time', { check_in_time, check_out_time });
+        this.logger.warn('Validation failed: Check-out time must be after check-in time', undefined, { check_in_time, check_out_time });
         throw new BadRequestException(
           'La hora de salida debe ser posterior a la hora de entrada',
         );
@@ -38,7 +38,7 @@ export class CreateVisitorAndAppointmentUseCase {
   }
 
   async execute(createVisitorDto: CreateVisitorDto): Promise<Visitor> {
-    this.logger.log('Attempting to create visitor and appointment', {
+    this.logger.log('Attempting to create visitor and appointment', undefined, {
       visitorEmail: createVisitorDto.email,
       supplierId: createVisitorDto.supplier_id,
       checkInTime: createVisitorDto.check_in_time
@@ -46,7 +46,7 @@ export class CreateVisitorAndAppointmentUseCase {
 
     const supplier = await this.supplierRepository.findById(createVisitorDto.supplier_id);
     if (!supplier) {
-      this.logger.warn('Supplier not found for visitor creation', { supplierId: createVisitorDto.supplier_id });
+      this.logger.warn('Supplier not found for visitor creation', undefined, { supplierId: createVisitorDto.supplier_id });
       throw new BadRequestException('El proveedor especificado no existe');
     }
 
@@ -65,7 +65,7 @@ export class CreateVisitorAndAppointmentUseCase {
     };
     const visitorInstance = this.visitorRepository.create(visitorEntityData);
     const savedVisitor = await this.visitorRepository.save(visitorInstance);
-    this.logger.log('Visitor entity created successfully', { visitorId: savedVisitor.id, email: savedVisitor.email });
+    this.logger.log('Visitor entity created successfully', undefined, { visitorId: savedVisitor.id, email: savedVisitor.email });
 
     // Create Appointment entity instance
     const appointmentEntityData: Partial<Appointment> = {
@@ -81,7 +81,7 @@ export class CreateVisitorAndAppointmentUseCase {
     };
     const appointmentInstance = this.appointmentRepository.create(appointmentEntityData);
     const savedAppointment = await this.appointmentRepository.save(appointmentInstance);
-    this.logger.log('Appointment entity created successfully', { appointmentId: savedAppointment.id, visitorId: savedVisitor.id });
+    this.logger.log('Appointment entity created successfully', undefined, { appointmentId: savedAppointment.id, visitorId: savedVisitor.id });
 
     // Send welcome email
     try {
@@ -92,9 +92,9 @@ export class CreateVisitorAndAppointmentUseCase {
         savedVisitor.location,
         // qrCodeUrl - this was optional in EmailService, decide if it's generated here or passed in DTO
       );
-      this.logger.log('Visitor welcome email dispatch requested', { visitorId: savedVisitor.id, email: savedVisitor.email });
+      this.logger.log('Visitor welcome email dispatch requested', undefined, { visitorId: savedVisitor.id, email: savedVisitor.email });
     } catch (error) {
-      this.logger.warn('Failed to send visitor welcome email', {
+      this.logger.warn('Failed to send visitor welcome email', undefined, {
         visitorId: savedVisitor.id,
         email: savedVisitor.email,
         error: error.message,
@@ -107,15 +107,15 @@ export class CreateVisitorAndAppointmentUseCase {
       const availableCards = await this.cardService.findAvailableCards();
       if (availableCards.length > 0) {
         await this.cardService.assignToVisitor(availableCards[0].id, savedVisitor.id);
-        this.logger.log('Card assigned to visitor', {
+        this.logger.log('Card assigned to visitor', undefined, {
           visitorId: savedVisitor.id,
           cardId: availableCards[0].id,
         });
       } else {
-        this.logger.warn('No available card to assign to visitor', { visitorId: savedVisitor.id });
+        this.logger.warn('No available card to assign to visitor', undefined, { visitorId: savedVisitor.id });
       }
     } catch (error) {
-      this.logger.warn('Failed to assign card to visitor', {
+      this.logger.warn('Failed to assign card to visitor', undefined, {
         visitorId: savedVisitor.id,
         error: error.message,
       });
@@ -126,12 +126,12 @@ export class CreateVisitorAndAppointmentUseCase {
     // This depends on how IVisitorRepository.findById is implemented (e.g., which relations it loads by default).
     const finalVisitor = await this.visitorRepository.findById(savedVisitor.id);
     if (!finalVisitor) {
-      this.logger.error('Failed to re-fetch visitor after creation, though creation was successful.', { visitorId: savedVisitor.id });
+      this.logger.error('Failed to re-fetch visitor after creation, though creation was successful.', undefined, { visitorId: savedVisitor.id });
       // This state is problematic: visitor was created but cannot be returned.
       // Depending on transactional setup, this might warrant a different error or handling.
       throw new NotFoundException(`Visitor with ID "${savedVisitor.id}" was created but could not be retrieved.`);
     }
-    this.logger.log('Successfully created visitor and appointment, and initiated post-creation tasks.', { visitorId: finalVisitor.id });
+    this.logger.log('Successfully created visitor and appointment, and initiated post-creation tasks.', undefined, { visitorId: finalVisitor.id });
     return finalVisitor;
   }
 }

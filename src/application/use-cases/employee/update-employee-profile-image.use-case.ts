@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { Employee } from '../../../../domain/entities/employee.entity';
-import { IEmployeeRepository } from '../../../../domain/repositories/employee.repository.interface';
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
+import { Employee } from 'src/domain/entities/employee.entity';
+import { IEmployeeRepository } from 'src/domain/repositories/employee.repository.interface';
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service';
 
 @Injectable()
 export class UpdateEmployeeProfileImageUseCase {
@@ -14,7 +14,7 @@ export class UpdateEmployeeProfileImageUseCase {
   }
 
   async execute(id: string, imageUrl: string): Promise<Employee> {
-    this.logger.log(`Attempting to update profile image URL for employee id: ${id}`, {
+    this.logger.log(`Attempting to update profile image URL for employee id: ${id}`, undefined, {
       employeeId: id,
       // Logging the newImageUrl might be verbose if it's a long signed URL.
       // Consider logging only a part of it or a flag indicating it's being updated.
@@ -25,7 +25,7 @@ export class UpdateEmployeeProfileImageUseCase {
     // 1. Fetch the existing employee.
     const employee = await this.employeeRepository.findById(id);
     if (!employee) {
-      this.logger.warn(`Employee not found for profile image update with id: ${id}`, { employeeId: id });
+      this.logger.warn(`Employee not found for profile image update with id: ${id}`, undefined, { employeeId: id });
       throw new NotFoundException(`Employee with ID "${id}" not found`);
     }
 
@@ -40,7 +40,7 @@ export class UpdateEmployeeProfileImageUseCase {
     // Note: The current EmployeeRepository.update(id, data) calls save then findById.
     // Here, we're more explicit: find, modify, save. Then re-fetch for consistency.
 
-    this.logger.log(`Successfully updated profile image URL in repository for employee id: ${id}`, {
+    this.logger.log(`Successfully updated profile image URL in repository for employee id: ${id}`, undefined, {
       employeeId: id,
       updatedImageUrlInRepo: imageUrl
     });
@@ -50,11 +50,11 @@ export class UpdateEmployeeProfileImageUseCase {
     const finalUpdatedEmployee = await this.employeeRepository.findById(id);
     if (!finalUpdatedEmployee) {
         // This should be extremely unlikely if the save operation succeeded.
-        this.logger.error('Critical: Failed to re-fetch employee after profile image URL update. Data inconsistency possible.', { employeeId: id});
+        this.logger.error('Critical: Failed to re-fetch employee after profile image URL update. Data inconsistency possible.', undefined, { employeeId: id});
         throw new NotFoundException(`Employee with ID "${id}" could not be found after the update operation.`);
     }
 
-    this.logger.log(`Re-fetched employee after profile image update for id: ${id}`, { employeeId: id });
+    this.logger.log(`Re-fetched employee after profile image update for id: ${id}`, undefined, { employeeId: id });
     return finalUpdatedEmployee;
   }
 }

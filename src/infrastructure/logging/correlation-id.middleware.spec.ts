@@ -42,7 +42,7 @@ describe('CorrelationIdMiddleware', () => {
     });
   });
 
-  beforeEach(()_ => {
+  beforeEach(() => { // Corrected syntax
     // Reset mocks
     mockAlsRun.mockClear();
     mockAlsGetStore.mockClear();
@@ -98,10 +98,15 @@ describe('CorrelationIdMiddleware', () => {
   });
 
   it('should populate LogContext correctly (without user)', () => {
-    mockRequest.method = 'GET';
-    mockRequest.path = '/test/path';
-    mockRequest.ip = '127.0.0.1';
-    mockRequest.headers['user-agent'] = 'TestAgent';
+    // Define properties at mock creation to avoid readonly assignment issues
+    mockRequest = {
+      headers: { 'user-agent': 'TestAgent' },
+      method: 'GET',
+      path: '/test/path',
+      ip: '127.0.0.1',
+      user: undefined, // Explicitly undefined if no user
+      get: (name: string) => mockRequest.headers[name.toLowerCase()], // Mock .get for headers
+    };
 
     middleware.use(mockRequest as Request, mockResponse as Response, nextFunction);
 
@@ -120,7 +125,13 @@ describe('CorrelationIdMiddleware', () => {
 
   it('should populate LogContext with userId if req.user.id is present', () => {
     const userId = 'user-id-from-req';
-    mockRequest.user = { id: userId }; // As per middleware logic for req.user.id
+    // Define properties at mock creation
+    mockRequest = {
+      ...mockRequest, // Spread previous default if any, or define all needed
+      headers: {},
+      user: { id: userId } as any, // Cast user to any if its type is complex
+      get: (name: string) => mockRequest.headers[name.toLowerCase()],
+    };
 
     middleware.use(mockRequest as Request, mockResponse as Response, nextFunction);
 
@@ -134,7 +145,13 @@ describe('CorrelationIdMiddleware', () => {
 
   it('should populate LogContext with userId if req.user.userId is present', () => {
     const userId = 'user-id-from-req-userId';
-    mockRequest.user = { userId: userId }; // As per middleware logic for req.user.userId
+    // Define properties at mock creation
+    mockRequest = {
+      ...mockRequest,
+      headers: {},
+      user: { userId: userId } as any,
+      get: (name: string) => mockRequest.headers[name.toLowerCase()],
+    };
 
     middleware.use(mockRequest as Request, mockResponse as Response, nextFunction);
 

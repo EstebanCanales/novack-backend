@@ -98,10 +98,12 @@ describe('CreateEmployeeUseCase', () => {
       }));
       expect(logger.log).toHaveBeenCalledWith(
         'Attempting to create employee account',
+        undefined,
         expect.objectContaining({ email: createEmployeeDto.email }),
       );
       expect(logger.log).toHaveBeenCalledWith(
         'Employee account created successfully',
+        undefined,
         expect.objectContaining({ employeeId: mockNewEmployee.id }),
       );
     });
@@ -115,6 +117,7 @@ describe('CreateEmployeeUseCase', () => {
       expect(repository.create).not.toHaveBeenCalled();
       expect(logger.warn).toHaveBeenCalledWith(
         'Employee account creation failed: Email already exists',
+        undefined,
         { email: createEmployeeDto.email },
       );
     });

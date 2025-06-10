@@ -56,10 +56,12 @@ describe('DeleteVisitorUseCase', () => {
       expect(repository.remove).toHaveBeenCalledWith(mockExistingVisitor);
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         `Attempting to delete visitor with id: ${visitorId}`,
+        undefined,
         { visitorId },
       );
       expect(mockLoggerService.log).toHaveBeenCalledWith(
         `Successfully deleted visitor with id: ${visitorId}`,
+        undefined,
         { visitorId },
       );
     });
@@ -72,6 +74,7 @@ describe('DeleteVisitorUseCase', () => {
       expect(repository.remove).not.toHaveBeenCalled(); // Ensure remove is not called
       expect(mockLoggerService.warn).toHaveBeenCalledWith(
         `Visitor not found for deletion with id: ${visitorId}`,
+        undefined,
         { visitorId },
       );
     });

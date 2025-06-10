@@ -1,11 +1,11 @@
 import { Inject, Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { Visitor } from '../../../../domain/entities/visitor.entity';
-import { Appointment } from '../../../../domain/entities/appointment.entity';
-import { IVisitorRepository } from '../../../../domain/repositories/visitor.repository.interface';
-import { IAppointmentRepository } from '../../../../domain/repositories/appointment.repository.interface';
-import { CardService } from '../../../services/card.service'; // Assuming path
-import { EmailService } from '../../../services/email.service'; // Assuming path
-import { StructuredLoggerService } from '../../../../infrastructure/logging/structured-logger.service';
+import { Visitor } from 'src/domain/entities/visitor.entity';
+import { Appointment } from 'src/domain/entities/appointment.entity';
+import { IVisitorRepository } from 'src/domain/repositories/visitor.repository.interface';
+import { IAppointmentRepository } from 'src/domain/repositories/appointment.repository.interface';
+import { CardService } from 'src/application/services/card.service';
+import { EmailService } from 'src/application/services/email.service';
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service';
 
 @Injectable()
 export class CheckOutVisitorUseCase {
@@ -22,23 +22,23 @@ export class CheckOutVisitorUseCase {
   }
 
   async execute(id: string): Promise<Visitor> {
-    this.logger.log(`Attempting to check out visitor with id: ${id}`, { visitorId: id });
+    this.logger.log(`Attempting to check out visitor with id: ${id}`, undefined, { visitorId: id });
 
     // Fetch visitor. IVisitorRepository.findById should specify if relations like 'appointments' and 'card' are loaded.
     // For robustness, we might need specific repository methods that guarantee these relations if they are not default.
     const visitor = await this.visitorRepository.findById(id);
     if (!visitor) {
-      this.logger.warn(`Visitor not found for check-out with id: ${id}`, { visitorId: id });
+      this.logger.warn(`Visitor not found for check-out with id: ${id}`, undefined, { visitorId: id });
       throw new NotFoundException(`Visitor with ID "${id}" not found`);
     }
 
     if (visitor.state === 'completado') {
-      this.logger.warn(`Visitor already checked out: ${id}`, { visitorId: id, currentState: visitor.state });
+      this.logger.warn(`Visitor already checked out: ${id}`, undefined, { visitorId: id, currentState: visitor.state });
       throw new BadRequestException('El visitante ya ha realizado el check-out');
     }
 
     if (!visitor.appointments || visitor.appointments.length === 0) {
-      this.logger.warn(`No appointments found for visitor during check-out: ${id}`, { visitorId: id });
+      this.logger.warn(`No appointments found for visitor during check-out: ${id}`, undefined, { visitorId: id });
       throw new BadRequestException('El visitante no tiene citas asociadas para procesar el check-out.');
     }
 
@@ -46,12 +46,12 @@ export class CheckOutVisitorUseCase {
     // Explicitly fetch the appointment to ensure it's fully loaded and to avoid issues if visitor.appointments is a partial load.
     const appointmentToUpdate = await this.appointmentRepository.findById(visitor.appointments[0].id);
     if (!appointmentToUpdate) {
-        this.logger.error('Associated appointment not found during checkout, though listed under visitor.', { visitorId: id, appointmentId: visitor.appointments[0].id });
+        this.logger.error('Associated appointment not found during checkout, though listed under visitor.', undefined, { visitorId: id, appointmentId: visitor.appointments[0].id });
         throw new NotFoundException(`Cita asociada con ID "${visitor.appointments[0].id}" no encontrada.`);
     }
 
     if (!appointmentToUpdate.check_in_time) {
-      this.logger.warn(`Visitor has not checked in for appointment: ${appointmentToUpdate.id}`, { visitorId: id, appointmentId: appointmentToUpdate.id });
+      this.logger.warn(`Visitor has not checked in for appointment: ${appointmentToUpdate.id}`, undefined, { visitorId: id, appointmentId: appointmentToUpdate.id });
       throw new BadRequestException('El visitante no ha realizado el check-in para esta cita.');
     }
 
@@ -59,21 +59,21 @@ export class CheckOutVisitorUseCase {
     appointmentToUpdate.check_out_time = new Date();
     appointmentToUpdate.status = 'completado';
     await this.appointmentRepository.save(appointmentToUpdate);
-    this.logger.log('Appointment updated to "completado" for check-out', { appointmentId: appointmentToUpdate.id, visitorId: id });
+    this.logger.log('Appointment updated to "completado" for check-out', undefined, { appointmentId: appointmentToUpdate.id, visitorId: id });
 
     // Update visitor state
     visitor.state = 'completado';
     // Any other visitor fields to update on checkout can be done here before saving.
     const updatedVisitor = await this.visitorRepository.save(visitor);
-    this.logger.log('Visitor state updated to "completado" for check-out', { visitorId: updatedVisitor.id });
+    this.logger.log('Visitor state updated to "completado" for check-out', undefined, { visitorId: updatedVisitor.id });
 
     // Unassign card if one is assigned
     if (visitor.card && visitor.card.id) { // Check if visitor.card and visitor.card.id exist
       try {
         await this.cardService.unassignFromVisitor(visitor.card.id);
-        this.logger.log('Card unassigned from visitor during check-out', { visitorId: id, cardId: visitor.card.id });
+        this.logger.log('Card unassigned from visitor during check-out', undefined, { visitorId: id, cardId: visitor.card.id });
       } catch (error) {
-        this.logger.warn(`Failed to unassign card during check-out for visitor: ${id}. This will not fail the checkout.`, {
+        this.logger.warn(`Failed to unassign card during check-out for visitor: ${id}. This will not fail the checkout.`, undefined, {
           visitorId: id,
           cardId: visitor.card.id,
           error: error.message,
@@ -91,9 +91,9 @@ export class CheckOutVisitorUseCase {
         appointmentToUpdate.check_out_time, // Set above, confirmed not null
         updatedVisitor.location,
       );
-      this.logger.log('Visitor checkout email dispatch requested successfully', { visitorId: updatedVisitor.id, email: updatedVisitor.email });
+      this.logger.log('Visitor checkout email dispatch requested successfully', undefined, { visitorId: updatedVisitor.id, email: updatedVisitor.email });
     } catch (error) {
-      this.logger.warn(`Failed to send visitor checkout email for: ${updatedVisitor.id}. This will not fail the checkout.`, {
+      this.logger.warn(`Failed to send visitor checkout email for: ${updatedVisitor.id}. This will not fail the checkout.`, undefined, {
         visitorId: updatedVisitor.id,
         email: updatedVisitor.email,
         error: error.message,
