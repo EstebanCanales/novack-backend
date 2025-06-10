@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { Visitor, Appointment, Supplier } from 'src/domain/entities';
 import { CardService } from './card.service';
 import { EmailService } from './email.service';
+import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service'; // Added import
 
 @Injectable()
 export class VisitorService {
@@ -18,7 +19,10 @@ export class VisitorService {
     private readonly supplierRepository: Repository<Supplier>,
     private readonly cardService: CardService,
     private readonly emailService: EmailService,
-  ) {}
+    private readonly logger: StructuredLoggerService, // Added logger
+  ) {
+    this.logger.setContext('VisitorService'); // Set context
+  }
 
   private validateDates(check_in_time: Date, check_out_time?: Date) {
     if (check_out_time) {
@@ -31,11 +35,18 @@ export class VisitorService {
   }
 
   async create(createVisitorDto: CreateVisitorDto) {
+    this.logger.log('Attempting to create visitor and appointment', undefined, {
+      visitorEmail: createVisitorDto.email,
+      supplierId: createVisitorDto.supplier_id,
+      appointmentTime: createVisitorDto.check_in_time,
+    });
+
     const supplier = await this.supplierRepository.findOne({
       where: { id: createVisitorDto.supplier_id },
     });
 
     if (!supplier) {
+      // Consider adding a log here if this is an important failure point not covered by GlobalExceptionFilter
       throw new BadRequestException('El proveedor no existe');
     }
 
@@ -60,7 +71,7 @@ export class VisitorService {
     const appointment = this.appointmentRepository.create({
       title: createVisitorDto.appointment,
       description: createVisitorDto.appointment_description,
-      scheduled_time: new Date(),
+      scheduled_time: new Date(), // Consider if this should be from DTO
       check_in_time: createVisitorDto.check_in_time,
       check_out_time: createVisitorDto.check_out_time,
       complaints: createVisitorDto.complaints || { invitado1: 'ninguno' },
@@ -71,6 +82,12 @@ export class VisitorService {
 
     await this.appointmentRepository.save(appointment);
 
+    this.logger.log('Visitor and appointment created successfully', undefined, {
+      visitorId: savedVisitor.id,
+      appointmentId: appointment.id,
+      email: savedVisitor.email,
+    });
+
     // Enviar email de bienvenida
     try {
       await this.emailService.sendVisitorWelcomeEmail(
@@ -79,8 +96,17 @@ export class VisitorService {
         appointment.check_in_time,
         savedVisitor.location,
       );
+      this.logger.log('Visitor welcome email sent successfully', undefined, {
+        visitorId: savedVisitor.id,
+        email: savedVisitor.email,
+      });
     } catch (error) {
-      console.error('Error al enviar email de bienvenida:', error);
+      this.logger.warn('Failed to send visitor welcome email', undefined, {
+        visitorId: savedVisitor.id,
+        email: savedVisitor.email,
+        error: error.message,
+      });
+      // console.error('Error al enviar email de bienvenida:', error); // Original console log replaced
     }
 
     // Intentar asignar una tarjeta
@@ -88,12 +114,24 @@ export class VisitorService {
       const availableCards = await this.cardService.findAvailableCards();
       if (availableCards.length > 0) {
         await this.cardService.assignToVisitor(availableCards[0].id, savedVisitor.id);
+        this.logger.log('Card assigned to visitor', undefined, {
+          visitorId: savedVisitor.id,
+          cardId: availableCards[0].id,
+        });
+      } else {
+        this.logger.warn('No available card to assign to visitor', undefined, {
+          visitorId: savedVisitor.id,
+        });
       }
     } catch (error) {
-      console.error('Error al asignar tarjeta:', error);
+      this.logger.warn('Failed to assign card to visitor', undefined, {
+        visitorId: savedVisitor.id,
+        error: error.message,
+      });
+      // console.error('Error al asignar tarjeta:', error); // Original console log replaced
     }
 
-    return this.findOne(savedVisitor.id);
+    return this.findOne(savedVisitor.id); // findOne will retrieve the full entity with relations
   }
 
   async findAll() {
@@ -116,9 +154,13 @@ export class VisitorService {
   }
 
   async update(id: string, updateVisitorDto: UpdateVisitorDto) {
+    this.logger.log('Attempting to update visitor/appointment', undefined, { visitorId: id });
     const visitor = await this.findOne(id);
 
     if (!visitor.appointments || visitor.appointments.length === 0) {
+      // This case might be an exception or a valid scenario depending on business logic.
+      // If it's an error, GlobalExceptionFilter will catch it.
+      // For now, no specific log before throwing, as it's a validation.
       throw new BadRequestException('El visitante no tiene citas asociadas');
     }
 
@@ -163,15 +205,26 @@ export class VisitorService {
 
     await this.appointmentRepository.save(appointment);
 
+    this.logger.log('Visitor/appointment updated successfully', undefined, { visitorId: id });
     return this.findOne(id);
   }
 
   async remove(id: string) {
-    const visitor = await this.findOne(id);
-    return await this.visitorRepository.remove(visitor);
+    this.logger.log('Attempting to delete visitor', undefined, { visitorId: id });
+    const visitor = await this.findOne(id); // Ensures visitor exists before attempting removal
+    await this.visitorRepository.remove(visitor);
+    this.logger.log('Visitor deleted successfully', undefined, { visitorId: id });
+    // The original method returns the result of remove, which might be void or the removed entity
+    // For logging purposes, we've logged success. The actual return type is determined by TypeORM.
+    // No explicit return here as the original was `return await this.visitorRepository.remove(visitor);`
+    // which after `await` would be `void` or similar from TypeORM's remove.
+    // If the original intended to return the visitor object, it should be `return visitor;`
+    // but that's not what `this.visitorRepository.remove(visitor)` does.
+    // For now, maintaining no explicit return if original implies void.
   }
 
   async checkOut(id: string) {
+    this.logger.log('Visitor check-out initiated', undefined, { visitorId: id });
     const visitor = await this.findOne(id);
 
     if (visitor.state === 'completado') {
@@ -195,9 +248,18 @@ export class VisitorService {
     await this.appointmentRepository.save(appointment);
     const updatedVisitor = await this.visitorRepository.save(visitor);
 
+    this.logger.log('Visitor check-out completed successfully', undefined, {
+      visitorId: updatedVisitor.id,
+      appointmentId: appointment.id,
+    });
+
     // Liberar la tarjeta si tiene una asignada
     if (visitor.card) {
       await this.cardService.unassignFromVisitor(visitor.card.id);
+      this.logger.log('Card unassigned from visitor during check-out', undefined, {
+        visitorId: visitor.id,
+        cardId: visitor.card.id,
+      });
     }
 
     // Enviar email de checkout
@@ -209,8 +271,17 @@ export class VisitorService {
         appointment.check_out_time,
         visitor.location,
       );
+      this.logger.log('Visitor checkout email sent successfully', undefined, {
+        visitorId: visitor.id,
+        email: visitor.email,
+      });
     } catch (error) {
-      console.error('Error al enviar email de checkout:', error);
+      this.logger.warn('Failed to send visitor checkout email', undefined, {
+        visitorId: visitor.id,
+        email: visitor.email,
+        error: error.message,
+      });
+      // console.error('Error al enviar email de checkout:', error); // Original console log replaced
     }
 
     return updatedVisitor;
@@ -243,6 +314,10 @@ export class VisitorService {
 
     visitor.profile_image_url = imageUrl;
     await this.visitorRepository.save(visitor);
+    this.logger.log('Visitor profile image URL updated', undefined, {
+      visitorId: id,
+      newImageUrl: imageUrl,
+    });
     return visitor; // Opcional: devolver el visitante actualizado
   }
 }

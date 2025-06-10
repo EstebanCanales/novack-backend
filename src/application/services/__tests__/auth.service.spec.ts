@@ -1,91 +1,108 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { JwtService } from '@nestjs/jwt';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { AuthService } from '../auth.service';
-import { EmployeeService } from '../employee.service';
-import { TokenService } from '../token.service';
-import { Employee, EmployeeAuth, RefreshToken, Supplier } from '../../../domain/entities';
-import { UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException, InternalServerErrorException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { StructuredLoggerService } from '../../../infrastructure/logging/structured-logger.service';
+import { TokenService } from '../token.service';
+import { Employee } from '../../../domain/entities';
 import { Request } from 'express';
+import { SmsService } from '../sms.service';
 
 jest.mock('bcrypt');
 
 describe('AuthService', () => {
   let service: AuthService;
-  let mockJwtService: Partial<JwtService>;
-  let mockEmployeeService: Partial<EmployeeService>;
-  let mockTokenService: Partial<TokenService>;
-  let mockEmployeeRepository: Partial<Repository<Employee>>;
-  let mockEmployeeAuthRepository: Partial<Repository<EmployeeAuth>>;
-  let mockRefreshTokenRepository: Partial<Repository<RefreshToken>>;
+  let mockEmployeeRepository: any;
+  let mockLoggerService: any;
+  let mockTokenService: any;
+  let mockSmsService: any;
+
+  // Datos de prueba
+  const mockEmail = 'test@example.com';
+  const mockPassword = 'password123';
+  let currentMockEmployee: Employee;
+
+  const createMockEmployeeCredentials = () => ({
+    id: 'cred-123',
+    employee_id: 'emp-123',
+    password_hash: 'hashedPassword',
+    password_salt: 'salt',
+    is_email_verified: true,
+    is_phone_verified: false,
+    is_sms_2fa_enabled: false,
+    phone_number_verified: false,
+    recovery_codes: null,
+    totp_secret_key: null,
+    totp_secret_url: null,
+    is_totp_verified: false,
+    totp_verified_at: null,
+    totp_enabled_at: null,
+    created_at: new Date(),
+    updated_at: new Date(),
+    last_login: new Date(),
+    last_password_change: new Date(),
+    sms_otp_code: null,
+    sms_otp_code_expires_at: null,
+  });
+
+  const createMockEmployee = () => {
+    const employee = new Employee();
+    employee.id = 'emp-123';
+    employee.email = mockEmail;
+    employee.first_name = 'Test';
+    employee.last_name = 'User';
+    employee.phone = '+1234567890';
+    employee.supplier_id = 'supp-123';
+    employee.created_at = new Date();
+    employee.updated_at = new Date();
+    employee.credentials = createMockEmployeeCredentials() as any;
+    return employee;
+  };
 
   beforeEach(async () => {
-    mockJwtService = {
-      signAsync: jest.fn().mockResolvedValue('test.jwt.token'),
-      verifyAsync: jest.fn().mockResolvedValue({ sub: 'test-id' }),
+    currentMockEmployee = createMockEmployee();
+
+    mockEmployeeRepository = {
+      findByEmailWithCredentialsAndPhone: jest.fn().mockResolvedValue(currentMockEmployee),
+      findByIdWithCredentialsAndPhone: jest.fn().mockResolvedValue(currentMockEmployee),
+      updateCredentials: jest.fn().mockResolvedValue({}),
     };
 
-    mockEmployeeService = {
-      findByEmail: jest.fn(),
+    mockLoggerService = {
+      setContext: jest.fn(),
+      log: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
     };
 
     mockTokenService = {
-      generateTokens: jest.fn().mockResolvedValue({
-        access_token: 'test.access.token',
-        refresh_token: 'test.refresh.token',
-        expires_in: 900,
-        token_type: 'Bearer',
-      }),
-      refreshAccessToken: jest.fn().mockResolvedValue({
-        access_token: 'new.access.token',
-        refresh_token: 'new.refresh.token',
-        expires_in: 900,
-        token_type: 'Bearer',
-      }),
-      revokeToken: jest.fn().mockResolvedValue(true),
-      validateToken: jest.fn().mockResolvedValue({ sub: 'test-id' }),
+      generateTokens: jest.fn(),
+      refreshAccessToken: jest.fn(),
+      revokeToken: jest.fn(),
     };
 
-    mockEmployeeRepository = {
-      findOne: jest.fn(),
-    };
-
-    mockEmployeeAuthRepository = {
-      save: jest.fn(),
-    };
-
-    mockRefreshTokenRepository = {
-      save: jest.fn(),
+    mockSmsService = {
+      sendOtp: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         {
-          provide: JwtService,
-          useValue: mockJwtService,
+          provide: 'IEmployeeRepository',
+          useValue: mockEmployeeRepository,
         },
         {
-          provide: EmployeeService,
-          useValue: mockEmployeeService,
+          provide: StructuredLoggerService,
+          useValue: mockLoggerService,
         },
         {
           provide: TokenService,
           useValue: mockTokenService,
         },
         {
-          provide: getRepositoryToken(Employee),
-          useValue: mockEmployeeRepository,
-        },
-        {
-          provide: getRepositoryToken(EmployeeAuth),
-          useValue: mockEmployeeAuthRepository,
-        },
-        {
-          provide: getRepositoryToken(RefreshToken),
-          useValue: mockRefreshTokenRepository,
+          provide: SmsService,
+          useValue: mockSmsService,
         },
       ],
     }).compile();
@@ -97,226 +114,220 @@ describe('AuthService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('validateEmployee', () => {
-    const mockEmail = 'test@example.com';
-    const mockPassword = 'password123';
-    const mockHashedPassword = 'hashed_password';
-    const mockEmployee = {
-      id: 'test-id',
-      email: mockEmail,
-      name: 'Test User',
-      phone: '1234567890',
-      position: 'Developer',
-      department: 'IT',
-      profile_image_url: null,
-      is_creator: false,
-      is_2fa_enabled: false,
-      is_email_verified: false,
-      login_attempts: 0,
-      two_factor_secret: null,
-      created_at: new Date(),
-      updated_at: new Date(),
-      deleted_at: null,
-      auth: {
-        password: mockHashedPassword,
-        login_attempts: 0,
-        locked_until: null,
-      },
-      supplier: { id: 'supplier-id' } as Supplier,
-    };
-
-    beforeEach(() => {
-      (bcrypt.compare as jest.Mock).mockReset();
-    });
-
-    it('should successfully validate employee credentials', async () => {
-      (mockEmployeeService.findByEmail as jest.Mock).mockResolvedValueOnce(mockEmployee);
-      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
-
-      const result = await service.validateEmployee(mockEmail, mockPassword);
-
-      expect(result.id).toEqual(mockEmployee.id);
-      expect(result.email).toEqual(mockEmployee.email);
-      expect(result.name).toEqual(mockEmployee.name);
-      expect(result.is_creator).toEqual(mockEmployee.is_creator);
-      expect(result.supplier).toEqual(mockEmployee.supplier);
-    });
-
-    it('should throw UnauthorizedException for invalid email', async () => {
-      (mockEmployeeService.findByEmail as jest.Mock).mockResolvedValueOnce(null);
-
-      await expect(service.validateEmployee(mockEmail, mockPassword))
-        .rejects
-        .toThrow(UnauthorizedException);
-    });
-
-    it('should throw UnauthorizedException for invalid password', async () => {
-      (mockEmployeeService.findByEmail as jest.Mock).mockResolvedValueOnce(mockEmployee);
-      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
-
-      await expect(service.validateEmployee(mockEmail, mockPassword))
-        .rejects
-        .toThrow(UnauthorizedException);
-    });
-
-    it('should throw UnauthorizedException for locked account', async () => {
-      const lockedEmployee = {
-        ...mockEmployee,
-        auth: {
-          ...mockEmployee.auth,
-          locked_until: new Date(Date.now() + 1000 * 60 * 15), // 15 minutes from now
-        },
-      };
-      (mockEmployeeService.findByEmail as jest.Mock).mockResolvedValueOnce(lockedEmployee);
-
-      await expect(service.validateEmployee(mockEmail, mockPassword))
-        .rejects
-        .toThrow(UnauthorizedException);
-    });
-
-    it('should increment login attempts on failed password', async () => {
-      (mockEmployeeService.findByEmail as jest.Mock).mockResolvedValueOnce(mockEmployee);
-      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
-
-      try {
-        await service.validateEmployee(mockEmail, mockPassword);
-      } catch (error) {
-        expect(mockEmployeeAuthRepository.save).toHaveBeenCalled();
-        const saveArg = (mockEmployeeAuthRepository.save as jest.Mock).mock.calls[0][0];
-        expect(saveArg.login_attempts).toBeGreaterThan(0);
-      }
-    });
-
-    it('should lock account after max login attempts', async () => {
-      const employeeWithMaxAttempts = {
-        ...mockEmployee,
-        auth: {
-          ...mockEmployee.auth,
-          login_attempts: 9, // One less than max
-        },
-      };
-      (mockEmployeeService.findByEmail as jest.Mock).mockResolvedValueOnce(employeeWithMaxAttempts);
-      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
-
-      try {
-        await service.validateEmployee(mockEmail, mockPassword);
-      } catch (error) {
-        expect(mockEmployeeAuthRepository.save).toHaveBeenCalled();
-        const saveArg = (mockEmployeeAuthRepository.save as jest.Mock).mock.calls[0][0];
-        expect(saveArg.login_attempts).toBeGreaterThanOrEqual(10);
-        expect(saveArg.locked_until).toBeInstanceOf(Date);
-        expect(error).toBeInstanceOf(UnauthorizedException);
-      }
-    });
-  });
-
   describe('login', () => {
-    const mockEmail = 'test@example.com';
-    const mockPassword = 'password123';
-    const mockEmployee = {
-      id: 'test-id',
-      email: mockEmail,
-      name: 'Test User',
-      phone: '1234567890',
-      position: 'Developer',
-      department: 'IT',
-      profile_image_url: null,
-      is_creator: false,
-      is_2fa_enabled: false,
-      is_email_verified: false,
-      login_attempts: 0,
-      two_factor_secret: null,
-      created_at: new Date(),
-      updated_at: new Date(),
-      deleted_at: null,
-      supplier: { id: 'supplier-id' } as Supplier,
-    };
-    
     const mockRequest = {
-      headers: {
-        'user-agent': 'test-user-agent',
-      },
+      headers: { 'user-agent': 'test-user-agent' },
       ip: '127.0.0.1',
     } as unknown as Request;
 
-    it('should return access token and employee data on successful login', async () => {
-      jest.spyOn(service, 'validateEmployee').mockResolvedValueOnce(mockEmployee);
+    it('should login successfully with valid credentials and no 2FA', async () => {
+      currentMockEmployee.credentials.is_sms_2fa_enabled = false;
+      mockEmployeeRepository.findByEmailWithCredentialsAndPhone.mockResolvedValue(currentMockEmployee);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true); // Password válida
       
-      const tokenResult = {
-        access_token: 'test.access.token',
-        refresh_token: 'test.refresh.token',
+      mockTokenService.generateTokens.mockResolvedValue({
+        access_token: 'new.access.token',
+        refresh_token: 'new.refresh.token',
         expires_in: 900,
         token_type: 'Bearer',
-      };
-      (mockTokenService.generateTokens as jest.Mock).mockResolvedValueOnce(tokenResult);
+      });
+
+      const result = await service.login(mockEmail, mockPassword, mockRequest);
+
+      expect(result).toHaveProperty('access_token', 'new.access.token');
+      expect(result.employee).toBeDefined();
+      expect(mockEmployeeRepository.findByEmailWithCredentialsAndPhone).toHaveBeenCalledWith(mockEmail);
+      expect(bcrypt.compare).toHaveBeenCalledWith(mockPassword, currentMockEmployee.credentials.password_hash);
+      expect(mockTokenService.generateTokens).toHaveBeenCalledWith(currentMockEmployee, mockRequest);
+      expect(mockEmployeeRepository.updateCredentials).toHaveBeenCalledWith(currentMockEmployee.id, { last_login: expect.any(Date) });
+      expect(mockLoggerService.log).toHaveBeenCalledWith('Login successful (no SMS OTP required or passed), generating tokens...', undefined, JSON.stringify({
+        userId: currentMockEmployee.id,
+        email: currentMockEmployee.email,
+        supplierId: currentMockEmployee.supplier_id,
+      }));
+    });
+
+    it('should throw UnauthorizedException if employee not found', async () => {
+      mockEmployeeRepository.findByEmailWithCredentialsAndPhone.mockResolvedValue(null);
+      await expect(service.login(mockEmail, mockPassword, mockRequest)).rejects.toThrow(UnauthorizedException);
+      expect(mockLoggerService.warn).toHaveBeenCalledWith('Login failed: Invalid credentials - User not found or no credentials', undefined, JSON.stringify({ email: mockEmail }));
+    });
+
+    it('should throw UnauthorizedException for incorrect password', async () => {
+      mockEmployeeRepository.findByEmailWithCredentialsAndPhone.mockResolvedValue(currentMockEmployee);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      await expect(service.login(mockEmail, mockPassword, mockRequest)).rejects.toThrow(UnauthorizedException);
+      expect(mockLoggerService.warn).toHaveBeenCalledWith('Login failed: Invalid credentials - Password mismatch', undefined, JSON.stringify({ email: mockEmail }));
+    });
+
+    it('should throw UnauthorizedException if email is not verified', async () => {
+      currentMockEmployee.credentials.is_email_verified = false;
+      mockEmployeeRepository.findByEmailWithCredentialsAndPhone.mockResolvedValue(currentMockEmployee);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      await expect(service.login(mockEmail, mockPassword, mockRequest)).rejects.toThrow(UnauthorizedException);
+      expect(mockLoggerService.warn).toHaveBeenCalledWith('Login failed: Email not verified', undefined, JSON.stringify({ email: mockEmail }));
+    });
+
+    it('should return smsOtpRequired if SMS 2FA is enabled and phone is verified', async () => {
+      currentMockEmployee.credentials.is_sms_2fa_enabled = true;
+      currentMockEmployee.credentials.phone_number_verified = true;
+      currentMockEmployee.phone = '+1234567890'; // Ensure phone is on the employee model directly
+
+      mockEmployeeRepository.findByEmailWithCredentialsAndPhone.mockResolvedValue(currentMockEmployee);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      mockSmsService.sendOtp.mockResolvedValue(undefined);
 
       const result = await service.login(mockEmail, mockPassword, mockRequest);
 
       expect(result).toEqual({
-        ...tokenResult,
-        employee: {
-          id: mockEmployee.id,
-          name: mockEmployee.name,
-          email: mockEmployee.email,
-          is_creator: mockEmployee.is_creator,
-          supplier: mockEmployee.supplier,
-        },
+        message: 'SMS OTP verification required.',
+        smsOtpRequired: true,
+        userId: currentMockEmployee.id,
       });
-      expect(mockTokenService.generateTokens).toHaveBeenCalledWith(mockEmployee, mockRequest);
+      expect(mockEmployeeRepository.updateCredentials).toHaveBeenCalledWith(currentMockEmployee.id, {
+        sms_otp_code: expect.any(String),
+        sms_otp_code_expires_at: expect.any(Date),
+      });
+      expect(mockSmsService.sendOtp).toHaveBeenCalledWith(currentMockEmployee.phone, expect.any(String));
+      expect(mockLoggerService.log).toHaveBeenCalledWith('SMS OTP sent for login process step', undefined, JSON.stringify({ userId: currentMockEmployee.id }));
     });
 
-    it('should throw UnauthorizedException on invalid credentials', async () => {
-      jest.spyOn(service, 'validateEmployee').mockRejectedValueOnce(new UnauthorizedException());
+    it('should throw InternalServerErrorException if SMS 2FA enabled but no phone number', async () => {
+      currentMockEmployee.credentials.is_sms_2fa_enabled = true;
+      currentMockEmployee.credentials.phone_number_verified = true;
+      currentMockEmployee.phone = null; // No phone
 
-      await expect(service.login(mockEmail, mockPassword, mockRequest))
-        .rejects
-        .toThrow(UnauthorizedException);
+      mockEmployeeRepository.findByEmailWithCredentialsAndPhone.mockResolvedValue(currentMockEmployee);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await expect(service.login(mockEmail, mockPassword, mockRequest)).rejects.toThrow(InternalServerErrorException);
+      expect(mockLoggerService.error).toHaveBeenCalledWith('SMS 2FA enabled but no phone number for user', undefined, JSON.stringify({ userId: currentMockEmployee.id }));
+    });
+
+    it('should throw InternalServerErrorException if smsService.sendOtp fails', async () => {
+      currentMockEmployee.credentials.is_sms_2fa_enabled = true;
+      currentMockEmployee.credentials.phone_number_verified = true;
+      currentMockEmployee.phone = '+1234567890';
+
+      mockEmployeeRepository.findByEmailWithCredentialsAndPhone.mockResolvedValue(currentMockEmployee);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      mockSmsService.sendOtp.mockRejectedValue(new Error('SMS failed'));
+
+      await expect(service.login(mockEmail, mockPassword, mockRequest)).rejects.toThrow(InternalServerErrorException);
+      expect(mockLoggerService.error).toHaveBeenCalledWith('Failed to send login OTP SMS via SmsService during login attempt', undefined, JSON.stringify({ userId: currentMockEmployee.id, error: 'SMS failed' }));
+    });
+
+  });
+
+  describe('verifySmsOtpAndLogin', () => {
+    const mockUserId = 'test-user-id';
+    const mockOtp = '123456';
+    let mockEmployeeWithOtp: Employee;
+
+    beforeEach(() => {
+        mockEmployeeWithOtp = createMockEmployee();
+        mockEmployeeWithOtp.id = mockUserId;
+        mockEmployeeWithOtp.credentials.sms_otp_code = mockOtp;
+        mockEmployeeWithOtp.credentials.sms_otp_code_expires_at = new Date(Date.now() + 5 * 60 * 1000);
+    });
+
+
+    const mockRequest = {
+      headers: { 'user-agent': 'test-user-agent' },
+      ip: '127.0.0.1',
+    } as unknown as Request;
+
+    it('should successfully verify OTP and login', async () => {
+      mockEmployeeRepository.findByIdWithCredentialsAndPhone.mockResolvedValue(mockEmployeeWithOtp);
+      mockTokenService.generateTokens.mockResolvedValue({
+        access_token: 'final.access.token',
+        refresh_token: 'final.refresh.token',
+        expires_in: 900,
+        token_type: 'Bearer',
+      });
+
+      const result = await service.verifySmsOtpAndLogin(mockUserId, mockOtp, mockRequest);
+
+      expect(result).toHaveProperty('access_token', 'final.access.token');
+      expect(result.employee).toBeDefined();
+      expect(mockEmployeeRepository.findByIdWithCredentialsAndPhone).toHaveBeenCalledWith(mockUserId);
+      expect(mockEmployeeRepository.updateCredentials).toHaveBeenCalledWith(mockUserId, {
+        last_login: expect.any(Date),
+        sms_otp_code: null,
+        sms_otp_code_expires_at: null,
+      });
+      expect(mockTokenService.generateTokens).toHaveBeenCalledWith(mockEmployeeWithOtp, mockRequest);
+      expect(mockLoggerService.log).toHaveBeenCalledWith('SMS OTP verified successfully, login completed', undefined, JSON.stringify({ userId: mockUserId }));
+    });
+
+    it('should throw UnauthorizedException if employee not found', async () => {
+      mockEmployeeRepository.findByIdWithCredentialsAndPhone.mockResolvedValue(null);
+      await expect(service.verifySmsOtpAndLogin(mockUserId, mockOtp, mockRequest)).rejects.toThrow(UnauthorizedException);
+      expect(mockLoggerService.warn).toHaveBeenCalledWith('SMS OTP login verification failed: Employee or credentials not found', undefined, JSON.stringify({ userId: mockUserId, reason: 'Employee or credentials not found' }));
+    });
+
+    it('should throw UnauthorizedException if no OTP is pending', async () => {
+      if(mockEmployeeWithOtp.credentials) mockEmployeeWithOtp.credentials.sms_otp_code = null;
+      mockEmployeeRepository.findByIdWithCredentialsAndPhone.mockResolvedValue(mockEmployeeWithOtp);
+      await expect(service.verifySmsOtpAndLogin(mockUserId, mockOtp, mockRequest)).rejects.toThrow(UnauthorizedException);
+      expect(mockLoggerService.warn).toHaveBeenCalledWith('SMS OTP login verification failed: No OTP pending', undefined, JSON.stringify({ userId: mockUserId, reason: 'No OTP pending or already verified' }));
+    });
+
+    it('should throw UnauthorizedException if OTP is expired', async () => {
+      if(mockEmployeeWithOtp.credentials) mockEmployeeWithOtp.credentials.sms_otp_code_expires_at = new Date(Date.now() - 1000);
+      mockEmployeeRepository.findByIdWithCredentialsAndPhone.mockResolvedValue(mockEmployeeWithOtp);
+      await expect(service.verifySmsOtpAndLogin(mockUserId, mockOtp, mockRequest)).rejects.toThrow(UnauthorizedException);
+      expect(mockEmployeeRepository.updateCredentials).toHaveBeenCalledWith(mockUserId, {
+        sms_otp_code: null,
+        sms_otp_code_expires_at: null,
+      });
+      expect(mockLoggerService.warn).toHaveBeenCalledWith('SMS OTP login verification failed: OTP has expired', undefined, JSON.stringify({ userId: mockUserId, reason: 'OTP expired' }));
+    });
+
+    it('should throw UnauthorizedException for invalid OTP', async () => {
+      mockEmployeeRepository.findByIdWithCredentialsAndPhone.mockResolvedValue(mockEmployeeWithOtp);
+      await expect(service.verifySmsOtpAndLogin(mockUserId, 'wrong-otp', mockRequest)).rejects.toThrow(UnauthorizedException);
+      expect(mockLoggerService.warn).toHaveBeenCalledWith('SMS OTP login verification failed: Invalid OTP', undefined, JSON.stringify({ userId: mockUserId, reason: 'Invalid OTP' }));
     });
   });
 
   describe('refreshToken', () => {
     const mockToken = 'valid.refresh.token';
-    const mockRequest = {} as Request;
+    const mockRequest = {} as Request; // Minimal request object
     
     it('should return new tokens', async () => {
+      mockTokenService.refreshAccessToken.mockResolvedValue({
+        access_token: 'refreshed.access.token',
+        refresh_token: 'refreshed.refresh.token',
+        expires_in: 900,
+        token_type: 'Bearer',
+      });
       const result = await service.refreshToken(mockToken, mockRequest);
       
-      expect(result).toHaveProperty('access_token');
-      expect(result).toHaveProperty('refresh_token');
+      expect(result).toHaveProperty('access_token', 'refreshed.access.token');
       expect(mockTokenService.refreshAccessToken).toHaveBeenCalledWith(mockToken, mockRequest);
+      expect(mockLoggerService.log).toHaveBeenCalledWith('Token refreshed successfully');
     });
   });
   
   describe('logout', () => {
     const mockToken = 'valid.refresh.token';
     
-    it('should revoke the refresh token', async () => {
+    it('should call tokenService.revokeToken and log success', async () => {
+      mockTokenService.revokeToken.mockResolvedValue(true);
       const result = await service.logout(mockToken);
       
-      expect(result).toBe(true);
+      expect(result).toEqual({ message: 'Logged out successfully' });
       expect(mockTokenService.revokeToken).toHaveBeenCalledWith(mockToken);
-    });
-  });
-
-  describe('validateToken', () => {
-    const mockToken = 'valid.jwt.token';
-
-    it('should return payload for valid token', async () => {
-      const mockPayload = { sub: 'test-id' };
-      (mockTokenService.validateToken as jest.Mock).mockResolvedValueOnce(mockPayload);
-
-      const result = await service.validateToken(mockToken);
-
-      expect(result).toEqual(mockPayload);
-      expect(mockTokenService.validateToken).toHaveBeenCalledWith(mockToken);
+      expect(mockLoggerService.log).toHaveBeenCalledWith('Refresh token revoked successfully.');
     });
 
-    it('should throw UnauthorizedException for invalid token', async () => {
-      (mockTokenService.validateToken as jest.Mock).mockRejectedValueOnce(new UnauthorizedException());
+    it('should handle token already revoked or invalid', async () => {
+      mockTokenService.revokeToken.mockResolvedValue(false);
+      const result = await service.logout(mockToken);
 
-      await expect(service.validateToken(mockToken))
-        .rejects
-        .toThrow(UnauthorizedException);
+      expect(result).toEqual({ message: 'Logout processed; token is invalid or already revoked.' });
+      expect(mockLoggerService.warn).toHaveBeenCalledWith('Failed to revoke refresh token (it may have been invalid or already revoked).');
     });
   });
 }); 

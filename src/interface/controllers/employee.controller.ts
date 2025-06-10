@@ -19,7 +19,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
-import { EmployeeService } from '../../application/services/employee.service';
+// EmployeeService removed
 import {
   CreateEmployeeDto,
   UpdateEmployeeDto,
@@ -28,12 +28,32 @@ import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiConsumes } fr
 import { FileStorageService } from '../../application/services/file-storage.service';
 import { ImageProcessingPipe } from '../../application/pipes/image-processing.pipe';
 import { Express } from 'express';
+// Import Use Cases
+import {
+  CreateEmployeeUseCase,
+  GetAllEmployeesUseCase,
+  GetEmployeeByIdUseCase,
+  UpdateEmployeeUseCase,
+  DeleteEmployeeUseCase,
+  UpdateEmployeeProfileImageUseCase,
+  // GetEmployeesBySupplierUseCase, // Not used in current controller version
+  // GetEmployeeByEmailUseCase,    // Not used in current controller version
+  // MarkEmployeeEmailAsVerifiedUseCase, // Not used in current controller version
+} from '../../application/use-cases/employee';
 
 @ApiTags('employees')
 @Controller('employees')
 export class EmployeeController {
   constructor(
-    private readonly employeeService: EmployeeService,
+    // Injected Use Cases
+    private readonly createEmployeeUseCase: CreateEmployeeUseCase,
+    private readonly getAllEmployeesUseCase: GetAllEmployeesUseCase,
+    private readonly getEmployeeByIdUseCase: GetEmployeeByIdUseCase,
+    private readonly updateEmployeeUseCase: UpdateEmployeeUseCase,
+    private readonly deleteEmployeeUseCase: DeleteEmployeeUseCase,
+    private readonly updateEmployeeProfileImageUseCase: UpdateEmployeeProfileImageUseCase,
+
+    // Existing direct dependencies for specific tasks like file upload
     private readonly fileStorageService: FileStorageService,
     private readonly configService: ConfigService,
   ) {}
@@ -74,7 +94,7 @@ export class EmployeeController {
     - Ya existe un creador para el proveedor`
   })
   create(@Body() createEmployeeDto: CreateEmployeeDto) {
-    return this.employeeService.create(createEmployeeDto);
+    return this.createEmployeeUseCase.execute(createEmployeeDto);
   }
 
   @Get()
@@ -106,7 +126,7 @@ export class EmployeeController {
     }
   })
   findAll() {
-    return this.employeeService.findAll();
+    return this.getAllEmployeesUseCase.execute();
   }
 
   @Get(':id')
@@ -142,7 +162,7 @@ export class EmployeeController {
   @ApiResponse({ status: 400, description: 'ID con formato inválido.' })
   @ApiResponse({ status: 404, description: 'Empleado no encontrado en el sistema.' })
   findOne(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.employeeService.findOne(id);
+    return this.getEmployeeByIdUseCase.execute(id);
   }
 
   @Patch(':id')
@@ -190,7 +210,7 @@ export class EmployeeController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() updateEmployeeDto: UpdateEmployeeDto,
   ) {
-    return this.employeeService.update(id, updateEmployeeDto);
+    return this.updateEmployeeUseCase.execute(id, updateEmployeeDto);
   }
 
   @Delete(':id')
@@ -216,7 +236,9 @@ export class EmployeeController {
   })
   @ApiResponse({ status: 404, description: 'Empleado no encontrado en el sistema.' })
   remove(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
-    return this.employeeService.remove(id);
+    // DeleteEmployeeUseCase returns Promise<void>, adjust controller if needed
+    // For HttpCode(HttpStatus.NO_CONTENT), returning nothing is fine.
+    return this.deleteEmployeeUseCase.execute(id);
   }
 
   @Patch(':id/profile-image')
@@ -260,7 +282,10 @@ export class EmployeeController {
       destinationPath,
     );
 
-    await this.employeeService.updateProfileImageUrl(id, imageUrl);
+    // Use the UpdateEmployeeProfileImageUseCase
+    // This use case returns the updated Employee entity.
+    // The controller can choose to return the full entity or a specific message.
+    await this.updateEmployeeProfileImageUseCase.execute(id, imageUrl);
 
     return { message: 'Imagen de perfil actualizada correctamente.', url: imageUrl };
   }

@@ -6,7 +6,7 @@
  */
 
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { ChatMessage, ChatRoom, ChatRoomType } from '../entities';
+import { ChatRoom, ChatRoomType } from '../../domain/entities';
 
 export class ChatDomainService {
   /**
