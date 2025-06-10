@@ -19,7 +19,7 @@ const mockLogTransportService = {
 describe('StructuredLoggerService', () => {
   let service: StructuredLoggerService;
   let als: AsyncLocalStorage<LogContext>;
-  let module: TestingModule; // To hold the module reference for some tests
+  let testingModule: TestingModule; // Renamed to avoid conflict
 
   afterEach(() => { // Reset static properties after each test
     (StructuredLoggerService as any).initialized = false;
@@ -42,7 +42,7 @@ describe('StructuredLoggerService', () => {
       return defaultValue;
     });
 
-    const module: TestingModule = await Test.createTestingModule({
+    testingModule = await Test.createTestingModule({ // Assign to testingModule
       providers: [
         StructuredLoggerService,
         // Provide the mock with a more specific type or use as is if Test.createTestingModule handles it
@@ -51,7 +51,7 @@ describe('StructuredLoggerService', () => {
       ],
     }).compile();
 
-    service = module.get<StructuredLoggerService>(StructuredLoggerService);
+    service = await testingModule.resolve<StructuredLoggerService>(StructuredLoggerService); // Use await resolve
     als = StructuredLoggerService.getContextStorage(); // Get the static ALS instance
 
     // Ensure a clean context for each test by exiting any existing ALS context
@@ -154,40 +154,33 @@ describe('StructuredLoggerService', () => {
   });
 
   describe('Context-Specific Log Levels', () => {
+    // This beforeEach sets up mockConfigService for context-specific levels.
+    // Tests within this describe block will create their own instances of StructuredLoggerService
+    // to pick up this specific configuration, relying on the global afterEach to reset static properties.
     beforeEach(() => {
       mockConfigService.get.mockImplementation((key: string) => {
         if (key === 'logging.level') return 'info'; // Default global level
         if (key === 'logging.contextLogLevels') return { 'SpecificContext': 'debug' };
         return undefined;
       });
-      // Re-initialize service with new context-specific config
-      // This 'service' instance is the one from the main beforeEach,
-      // which is already created via Test.createTestingModule.
-      // The lines creating newService, debugService, verboseService are the ones needing the cast.
-      // This line re-assigns the main 'service' variable.
-      service = module.get<StructuredLoggerService>(StructuredLoggerService); // Get a fresh instance from the module configured with new mocks
-      // Or, if direct instantiation is necessary for some reason for 'service':
-      // service = new StructuredLoggerService(mockConfigService as any, mockLogTransportService);
-      // Let's ensure 'service' is re-instantiated if ConfigService state matters deeply for it.
-      // For this test, it's better to re-get from a reconfigured module or ensure static parts are reset.
-      // The static `initialized` flag in StructuredLoggerService means new ConfigService values won't be picked up
-      // by `new StructuredLoggerService()` after the first init unless that flag is reset.
-      // This 'service' instance is configured by the main beforeEach, which sets global to 'info'.
-      // The context-specific config is set here before this test runs.
-      // Crucially, the static `initialized` flag needs to be false for a new instance to pick up this new config.
-      // The afterEach hook should handle resetting `initialized`.
+    });
+
+    it('should log "debug" for "SpecificContext" when its level is "debug" and global is "info"', () => {
+      // Create a new instance that will pick up the modified config due to static reset in global afterEach
       const contextSpecificService = new StructuredLoggerService(mockConfigService as any, mockLogTransportService as any);
       contextSpecificService.debug('Debug message for specific context', 'SpecificContext');
       expect(mockLogTransportService.sendLog).toHaveBeenCalledWith(expect.objectContaining({ level: 'debug', context: 'SpecificContext' }));
     });
 
     it('should NOT log "debug" for "OtherContext" when global is "info"', () => {
+      // This instance will use the config from this describe's beforeEach
       const contextSpecificService = new StructuredLoggerService(mockConfigService as any, mockLogTransportService as any);
       contextSpecificService.debug('Debug message for other context', 'OtherContext');
       expect(mockLogTransportService.sendLog).not.toHaveBeenCalled();
     });
 
     it('should log "info" for "SpecificContext" (which is set to "debug" level)', () => {
+      // This instance will use the config from this describe's beforeEach
       const contextSpecificService = new StructuredLoggerService(mockConfigService as any, mockLogTransportService as any);
       contextSpecificService.log('Info message for specific context', 'SpecificContext');
       expect(mockLogTransportService.sendLog).toHaveBeenCalledWith(expect.objectContaining({ level: 'info', context: 'SpecificContext' }));

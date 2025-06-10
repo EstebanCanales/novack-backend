@@ -33,8 +33,8 @@ jest.mock('fs', () => ({
 describe('LogTransportService', () => {
   let service: LogTransportService;
   let mockConfigService: ConfigService;
-  let mockSocket: net.Socket;
-  let mockWriteStream: fs.WriteStream;
+  let mockSocketInstance: jest.Mocked<net.Socket>; // Renamed for clarity and typing
+  let mockWriteStream: fs.WriteStream; // This might still be okay if used carefully
 
   beforeEach(async () => {
     // Reset mocks
@@ -46,10 +46,40 @@ describe('LogTransportService', () => {
         on: jest.fn(),
       }));
 
-    // Create a fresh mock socket for each test to reset its jest.fn() calls
-    mockSocket = new (net.Socket as any)() as jest.Mocked<net.Socket>;
-    (net.Socket as jest.Mock).mockImplementation(() => mockSocket);
+    // Define the specific methods for the instance to be returned for each test
+    mockSocketInstance = {
+      connect: jest.fn().mockImplementation((portOrPath: any, hostOrConnectListener?: any, connectListener?: any) => {
+        if (typeof hostOrConnectListener === 'function') { // (path, listener) or (port, listener)
+          hostOrConnectListener();
+        } else if (typeof connectListener === 'function') { // (port, host, listener)
+          connectListener();
+        }
+        return mockSocketInstance; // Return instance for chaining if any
+      }),
+      on: jest.fn().mockReturnThis(),
+      write: jest.fn((data: any, encoding?: any, callback?: any) => {
+        if (typeof encoding === 'function') callback = encoding;
+        if (typeof callback === 'function') callback();
+        return true; // Simulate successful write
+      }),
+      destroy: jest.fn().mockReturnThis(),
+      setTimeout: jest.fn().mockReturnThis(),
+      writable: true, // Default writable state
+      // Add all other methods from net.Socket that might be called by the service
+      removeAllListeners: jest.fn().mockReturnThis(),
+      end: jest.fn((callback?: () => void) => { if(callback) callback(); return mockSocketInstance; }),
+      setEncoding: jest.fn().mockReturnThis(),
+      setKeepAlive: jest.fn().mockReturnThis(),
+      setNoDelay: jest.fn().mockReturnThis(),
+      ref: jest.fn().mockReturnThis(),
+      unref: jest.fn().mockReturnThis(),
+      // Mock properties if they are read by the service
+      // remoteAddress, remotePort etc. can be added if needed
+    } as unknown as jest.Mocked<net.Socket>;
 
+    // Configure the mocked Socket constructor to return this specific, fresh instance
+    const MockedSocketConstructor = net.Socket as jest.MockedClass<typeof net.Socket>;
+    MockedSocketConstructor.mockReturnValue(mockSocketInstance);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -76,7 +106,11 @@ describe('LogTransportService', () => {
 
     service = module.get<LogTransportService>(LogTransportService);
     mockConfigService = module.get<ConfigService>(ConfigService);
-    mockWriteStream = (fs.createWriteStream as jest.Mock).mock.results[0]?.value; // Get the instance
+    // mockWriteStream retrieval might be better per test if multiple streams are created
+    // For now, if only one is expected during setup by LogTransportService, this might be fine.
+    // However, LogTransportService is instantiated in some tests with different configs, potentially creating new streams.
+    // It's safer to get the stream instance inside tests that specifically deal with file writing.
+    // mockWriteStream = (fs.createWriteStream as jest.Mock).mock.results[0]?.value;
   });
 
   afterEach(() => {
@@ -92,18 +126,27 @@ describe('LogTransportService', () => {
 
   describe('Initialization', () => {
     it('should not connect to Logstash if ELK_ENABLED is false', () => {
-      expect(mockSocket.connect).not.toHaveBeenCalled();
+      // Service is initialized in outer beforeEach with ELK_ENABLED=false by default
+      expect(mockSocketInstance.connect).not.toHaveBeenCalled();
     });
 
     it('should attempt to connect to Logstash if ELK_ENABLED is true', async () => {
       (mockConfigService.get as jest.Mock).mockImplementation((key: string) => {
         if (key === 'ELK_ENABLED') return 'true';
-        return 'test'; // default for others
+        if (key === 'LOGSTASH_HOST') return 'logstash';
+        if (key === 'LOGSTASH_PORT') return 5000;
+        return 'test';
       });
+      // This newService instance will trigger another `new net.Socket()` which will return mockSocketInstance
+      // due to the updated MockedSocketConstructor.mockReturnValue(mockSocketInstance) in the outer beforeEach.
+      // This means assertions will be on the same mockSocketInstance.
+      // If tests need truly independent socket mocks per LogTransportService instance,
+      // the mockSocketInstance creation and MockedSocketConstructor.mockReturnValue would need to be
+      // inside this test or its own beforeEach. For now, this tests if *a* connect is called.
       const newService = new LogTransportService(mockConfigService);
-      // Use setImmediate to allow async operations in onModuleInit to proceed
-      await new Promise(setImmediate);
-      expect(mockSocket.connect).toHaveBeenCalled();
+      newService.onModuleInit(); // Call onModuleInit to trigger connection attempt
+      await new Promise(setImmediate); // Allow async operations like connect to proceed
+      expect(mockSocketInstance.connect).toHaveBeenCalledWith(5000, 'logstash', expect.any(Function));
     });
 
     it('should create log directory if LOG_TO_FILE is true and directory does not exist', () => {

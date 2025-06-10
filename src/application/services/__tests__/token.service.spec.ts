@@ -102,22 +102,21 @@ describe('TokenService', () => {
         id: 'cred-id',
         is_email_verified: true,
         two_factor_enabled: false,
-        // Add all required fields for EmployeeCredentials or ensure it is also fully mocked
-        password_hash: 'hashedpassword',
-        login_attempts: 0,
-        is_sms_2fa_enabled: false,
-        phone_number_verified: false,
-        locked_until: null,
-        last_login: null,
+        password_hash: 'hashedpassword', // Required
+        is_sms_2fa_enabled: false,     // Required (has default)
+        phone_number_verified: false,  // Required (has default)
+        employee_id: 'employee-id',    // Required
+        // Optional / Nullable fields
+        two_factor_secret: null,
+        backup_codes: [],
+        reset_token: null,
+        reset_token_expires: null,
         verification_token: null,
-        verification_token_expires_at: null,
-        reset_password_token: null,
-        reset_password_token_expires_at: null,
+        // verification_token_expires_at: null, // Not in EmployeeCredentials entity
         sms_otp_code: null,
         sms_otp_code_expires_at: null,
-        backup_codes: [],
-        employee_id: 'employee-id', // if EmployeeCredentials requires it
-        employee: null // This would be circular, set to null or a minimal mock if absolutely needed
+        last_login: null,
+        employee: null // Circular, set to null
       } as EmployeeCredentials,
       cards: [],
       chat_rooms: [],
@@ -173,25 +172,25 @@ describe('TokenService', () => {
           id: 'cred-id',
           is_email_verified: true,
           two_factor_enabled: false,
-          password_hash: 'hashedpassword',
-          login_attempts: 0,
-          is_sms_2fa_enabled: false,
-          phone_number_verified: false,
-          locked_until: null,
-          last_login: null,
+          password_hash: 'hashedpassword', // Required
+          is_sms_2fa_enabled: false,     // Required (has default)
+          phone_number_verified: false,  // Required (has default)
+          employee_id: 'employee-id',    // Required
+          // Optional / Nullable fields
+          two_factor_secret: null,
+          backup_codes: [],
+          reset_token: null,
+          reset_token_expires: null,
           verification_token: null,
-          verification_token_expires_at: null,
-          reset_password_token: null,
-          reset_password_token_expires_at: null,
+          // verification_token_expires_at: null, // Not in EmployeeCredentials entity
           sms_otp_code: null,
           sms_otp_code_expires_at: null,
-          backup_codes: [],
-          employee_id: 'employee-id',
-          employee: null
+          last_login: null,
+          employee: null // Circular, set to null
         } as EmployeeCredentials,
         cards: [],
         chat_rooms: [],
-      } as Employee, // Now a full Employee
+      } as Employee,
     };
 
     beforeEach(() => {

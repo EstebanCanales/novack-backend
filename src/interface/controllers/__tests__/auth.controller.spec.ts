@@ -13,6 +13,47 @@ describe('AuthController', () => {
   let mockAuthService: Partial<AuthService>;
   // mockAuthenticateEmployeeUseCase removed
 
+  // Define a comprehensive mock request object at the top level of the describe block
+  const mockRequestBase = {
+    headers: { 'user-agent': 'jest-test' },
+    ip: '127.0.0.1',
+    cookies: {},
+    signedCookies: {},
+    get: jest.fn((name: string) => mockRequestBase.headers[name.toLowerCase()]), // Allow access to headers via get
+    header: jest.fn((name: string) => mockRequestBase.headers[name.toLowerCase()]),
+    accepts: jest.fn(),
+    is: jest.fn(),
+    params: {},
+    query: {},
+    body: {},
+    method: 'POST', // Default method
+    url: '/',         // Default URL
+    route: { path: '/' },
+    user: null,
+    app: {} as any,
+    res: {} as any,
+    next: jest.fn(),
+    aborted: false,
+    httpVersion: '1.1',
+    httpVersionMajor: 1,
+    httpVersionMinor: 1,
+    complete: true,
+    connection: {} as any,
+    socket: {} as any,
+    trailers: {},
+    rawTrailers: [],
+    setTimeout: jest.fn() as any,
+    statusCode: 200,
+    statusMessage: 'OK',
+    destroy: jest.fn(),
+    logIn: jest.fn(),
+    logOut: jest.fn(),
+    isAuthenticated: jest.fn(),
+    isUnauthenticated: jest.fn(),
+    session: {} as any,
+    flash: jest.fn(),
+  } as any; // Cast to any for simplicity in test setup
+
 
   beforeEach(async () => {
     mockAuthService = {
@@ -45,46 +86,7 @@ describe('AuthController', () => {
       password: 'password123',
     };
 
-    // Define a more complete base mock request object
-    const mockRequestBase = {
-      headers: { 'user-agent': 'jest-test' },
-      ip: '127.0.0.1',
-      cookies: {},
-      signedCookies: {},
-      get: jest.fn(),
-      header: jest.fn(),
-      accepts: jest.fn(),
-      is: jest.fn(),
-      params: {},
-      query: {},
-      body: {},
-      method: 'POST',
-      url: '/auth/login', // Example URL
-      route: { path: '/auth/login' },
-      user: null,
-      app: {} as any, // Mock app object
-      res: {} as any, // Mock res object
-      next: jest.fn(), // Mock next function
-      aborted: false,
-      httpVersion: '1.1',
-      httpVersionMajor: 1,
-      httpVersionMinor: 1,
-      complete: true,
-      connection: {} as any,
-      socket: {} as any,
-      trailers: {},
-      rawTrailers: [],
-      setTimeout: jest.fn() as any,
-      statusCode: 200,
-      statusMessage: 'OK',
-      destroy: jest.fn(),
-      logIn: jest.fn(), // For Passport compatibility
-      logOut: jest.fn(),
-      isAuthenticated: jest.fn(),
-      isUnauthenticated: jest.fn(),
-      session: {} as any, // Mock session object
-      flash: jest.fn(),
-    } as any; // Using 'as any' for brevity in example, can be 'as unknown as Request'
+    // mockRequestBase is now defined at the describe level
 
     const mockResponse = {
       access_token: 'test-token',
@@ -124,46 +126,7 @@ describe('AuthController', () => {
       refresh_token: 'valid-refresh-token',
     };
 
-    // Define a more complete base mock request object for this context too
-    const mockRequestBase = {
-      headers: { 'user-agent': 'jest-test' },
-      ip: '127.0.0.1',
-      cookies: {},
-      signedCookies: {},
-      get: jest.fn(),
-      header: jest.fn(),
-      accepts: jest.fn(),
-      is: jest.fn(),
-      params: {},
-      query: {},
-      body: {},
-      method: 'POST', // Or GET, etc., depending on the test
-      url: '/auth/refresh', // Example URL
-      route: { path: '/auth/refresh' },
-      user: null,
-      app: {} as any,
-      res: {} as any,
-      next: jest.fn(),
-      aborted: false,
-      httpVersion: '1.1',
-      httpVersionMajor: 1,
-      httpVersionMinor: 1,
-      complete: true,
-      connection: {} as any,
-      socket: {} as any,
-      trailers: {},
-      rawTrailers: [],
-      setTimeout: jest.fn() as any,
-      statusCode: 200,
-      statusMessage: 'OK',
-      destroy: jest.fn(),
-      logIn: jest.fn(),
-      logOut: jest.fn(),
-      isAuthenticated: jest.fn(),
-      isUnauthenticated: jest.fn(),
-      session: {} as any,
-      flash: jest.fn(),
-    } as any;
+    // mockRequestBase is now defined at the describe level
 
     const mockResponse = {
       access_token: 'new-access-token',

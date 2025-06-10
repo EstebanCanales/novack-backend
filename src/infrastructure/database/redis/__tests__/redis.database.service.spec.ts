@@ -91,6 +91,7 @@ describe('RedisDatabaseService', () => {
 
     service = module.get<RedisDatabaseService>(RedisDatabaseService);
     configService = module.get<ConfigService>(ConfigService);
+    await service.onModuleInit(); // Call onModuleInit
   });
 
   it('should be defined', () => {
@@ -131,7 +132,7 @@ describe('RedisDatabaseService', () => {
       jest.spyOn(service as any, 'encrypt').mockImplementation((value) => value);
       
       // Setup
-      (service['redisClient'] as any) = new MockRedis();
+      // (service['redisClient'] as any) = new MockRedis(); // Rely on DI + onModuleInit
       const roomId = 'room123';
       const message = { id: 'msg456', content: 'Hola mundo' };
 
@@ -162,7 +163,7 @@ describe('RedisDatabaseService', () => {
       jest.spyOn(service as any, 'decrypt').mockImplementation((value) => value);
       
       // Setup
-      (service['redisClient'] as any) = new MockRedis();
+      // (service['redisClient'] as any) = new MockRedis(); // Rely on DI + onModuleInit
       const roomId = 'room123';
       const messageIds = ['msg456', 'msg789'];
       const mockMessages = {
@@ -194,7 +195,7 @@ describe('RedisDatabaseService', () => {
       jest.spyOn(service as any, 'encrypt').mockImplementation((value) => value);
       
       // Setup
-      (service['redisClient'] as any) = new MockRedis();
+      // (service['redisClient'] as any) = new MockRedis(); // Rely on DI + onModuleInit
       const cardId = 'card123';
       const location = {
         latitude: 40.7128,

@@ -8,10 +8,22 @@ import { BadRequestException } from '@nestjs/common';
 import { CreateEmployeeDto, UpdateEmployeeDto } from '../../dtos/employee';
 import * as bcrypt from 'bcrypt';
 import { IEmployeeRepository } from '../../../domain/repositories/employee.repository.interface';
+import { StructuredLoggerService } from '../../../infrastructure/logging/structured-logger.service'; // Added import
+
+// Define mock for StructuredLoggerService
+const mockLoggerService = {
+  setContext: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+  verbose: jest.fn(),
+};
 
 describe('EmployeeService', () => {
   let service: EmployeeService;
   let employeeRepositoryMock: IEmployeeRepository;
+  // Removed logger declaration here as it's not assigned or used at this scope in other similar spec files
 
   // Mock data
   const mockSupplier = {
@@ -75,7 +87,11 @@ describe('EmployeeService', () => {
         {
           provide: 'IEmployeeRepository',
           useValue: employeeRepositoryMock
-        }
+        },
+        { // Added provider for StructuredLoggerService
+          provide: StructuredLoggerService,
+          useValue: mockLoggerService,
+        },
       ],
     }).compile();
 
