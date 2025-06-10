@@ -118,7 +118,7 @@ describe('CorrelationIdMiddleware', () => {
   });
 
   it('should generate a new correlationId if not in headers', () => {
-    const mockRequest = { ...mockRequestBase, headers: {} };
+    const mockRequest = { ...mockRequestBase, headers: {} } as unknown as Request;
     const createIdSpy = jest.spyOn(StructuredLoggerService, 'createCorrelationId');
     middleware.use(mockRequest, mockResponse as Response, nextFunction);
     expect(createIdSpy).toHaveBeenCalled();
@@ -128,7 +128,7 @@ describe('CorrelationIdMiddleware', () => {
 
   it('should use existing correlationId from request headers', () => {
     const existingCorrId = 'existing-uuid-123';
-    const mockRequest = { ...mockRequestBase, headers: { 'x-correlation-id': existingCorrId } };
+    const mockRequest = { ...mockRequestBase, headers: { 'x-correlation-id': existingCorrId } } as unknown as Request;
     const createIdSpy = jest.spyOn(StructuredLoggerService, 'createCorrelationId');
 
     middleware.use(mockRequest, mockResponse as Response, nextFunction);
@@ -139,13 +139,13 @@ describe('CorrelationIdMiddleware', () => {
   });
 
   it('should set correlationId in response headers', () => {
-    const mockRequest = { ...mockRequestBase, headers: {} };
+    const mockRequest = { ...mockRequestBase, headers: {} } as unknown as Request;
     middleware.use(mockRequest, mockResponse as Response, nextFunction);
     expect(mockResponse.setHeader).toHaveBeenCalledWith('x-correlation-id', expect.any(String));
   });
 
   it('should run next() in AsyncLocalStorage context', () => {
-    const mockRequest = { ...mockRequestBase, headers: {} };
+    const mockRequest = { ...mockRequestBase, headers: {} } as unknown as Request;
     middleware.use(mockRequest, mockResponse as Response, nextFunction);
     expect(mockGetContextStorage).toHaveBeenCalled(); // Check if getContextStorage was called
     expect(mockAlsRun).toHaveBeenCalled();
@@ -160,7 +160,7 @@ describe('CorrelationIdMiddleware', () => {
       path: '/test/path',
       ip: '127.0.0.1',
       user: undefined,
-    };
+    } as unknown as Request;
     // Re-assign get/header to use this specific mockRequest's headers
     mockRequest.get = jest.fn().mockImplementation((name: string): string | string[] | undefined => {
       const lowerName = name.toLowerCase();
@@ -179,7 +179,6 @@ describe('CorrelationIdMiddleware', () => {
         method: 'GET',
         userAgent: 'TestAgent',
         ip: '127.0.0.1',
-        userId: undefined
       }),
       expect.any(Function)
     );
@@ -191,7 +190,7 @@ describe('CorrelationIdMiddleware', () => {
       ...mockRequestBase,
       headers: {},
       user: { id: userId } as any,
-    };
+    } as unknown as Request;
     mockRequest.get = jest.fn().mockImplementation((name: string): string | string[] | undefined => {
       const lowerName = name.toLowerCase();
       if (lowerName === 'set-cookie') return (mockRequest.headers as any)[lowerName] as string[] | undefined;
@@ -215,7 +214,7 @@ describe('CorrelationIdMiddleware', () => {
       ...mockRequestBase,
       headers: {},
       user: { userId: userId } as any,
-    };
+    } as unknown as Request;
     mockRequest.get = jest.fn().mockImplementation((name: string): string | string[] | undefined => {
       const lowerName = name.toLowerCase();
       if (lowerName === 'set-cookie') return (mockRequest.headers as any)[lowerName] as string[] | undefined;

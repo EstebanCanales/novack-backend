@@ -60,7 +60,7 @@ export class CreateVisitorAndAppointmentUseCase {
       location: createVisitorDto.location,
       state: 'pendiente', // Initial state
       supplier: supplier,
-      // supplier_id: supplier.id, // TypeORM should handle this via the 'supplier' object relation
+      supplier_id: supplier.id, // Añadido para asignar el supplier_id explícitamente
       // profile_image_url can be set if part of DTO and entity
     };
     const visitorInstance = this.visitorRepository.create(visitorEntityData);
@@ -126,7 +126,7 @@ export class CreateVisitorAndAppointmentUseCase {
     // This depends on how IVisitorRepository.findById is implemented (e.g., which relations it loads by default).
     const finalVisitor = await this.visitorRepository.findById(savedVisitor.id);
     if (!finalVisitor) {
-      this.logger.error('Failed to re-fetch visitor after creation, though creation was successful.', undefined, { visitorId: savedVisitor.id });
+      this.logger.error('Failed to re-fetch visitor after creation, though creation was successful.', undefined, undefined, { visitorId: savedVisitor.id });
       // This state is problematic: visitor was created but cannot be returned.
       // Depending on transactional setup, this might warrant a different error or handling.
       throw new NotFoundException(`Visitor with ID "${savedVisitor.id}" was created but could not be retrieved.`);

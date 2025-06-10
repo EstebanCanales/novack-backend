@@ -2,13 +2,15 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 // VisitorService is removed
 import { VisitorController } from '../../interface/controllers/visitor.controller';
-import { Visitor, Supplier, Appointment } from '../../../domain/entities'; // Adjusted path for domain entities
+import { Visitor, Supplier, Appointment } from '../../domain/entities'; // Corregida la ruta de importación
+import { SupplierSubscription } from '../../domain/entities/supplier-subscription.entity'; // Importando SupplierSubscription
 import { EmailService } from '../services/email.service'; // Kept as it's used by use cases
 import { CardModule } from './card.module'; // Used by use cases (CardService)
 import { FileStorageModule } from './file-storage.module'; // Used by VisitorController
 import { ImageProcessingPipe } from '../pipes/image-processing.pipe'; // Used by VisitorController
 // TokenModule is kept, assuming it might be used elsewhere or for future features.
 import { TokenModule } from './token.module';
+import { SupplierModule } from './supplier.module'; // Importando SupplierModule
 
 // Import Use Cases
 import {
@@ -27,14 +29,14 @@ import {
   IVisitorRepository,
   IAppointmentRepository,
   ISupplierRepository
-} from '../../../domain/repositories';
+} from '../../domain/repositories'; // Corregida la ruta de importación
 
 // Import Concrete Repository Implementations
 import {
   VisitorRepository,
   AppointmentRepository,
-  SupplierRepository // Assuming this exists and is exported from infrastructure/repositories
-} from '../../../infrastructure/repositories';
+  // SupplierRepository se usará desde SupplierModule
+} from '../../infrastructure/repositories'; // Corregida la ruta de importación
 
 // Potentially import SupplierModule and EmailModule if they exist and provide services/repositories
 // import { SupplierModule } from './supplier.module';
@@ -43,11 +45,11 @@ import {
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([Visitor, Supplier, Appointment]),
+        TypeOrmModule.forFeature([Visitor, Supplier, Appointment, SupplierSubscription]),
         CardModule,       // Provides CardService
         FileStorageModule,  // Provides FileStorageService
         TokenModule,        // Retained
-        // SupplierModule, // If this module provided ISupplierRepository
+        SupplierModule,     // Importando SupplierModule para tener acceso a ISupplierRepository
         // EmailModule,    // If this module provided EmailService
     ],
     controllers: [VisitorController],
@@ -65,11 +67,8 @@ import {
         // Bind repository interfaces to their concrete implementations
         { provide: IVisitorRepository, useClass: VisitorRepository },
         { provide: IAppointmentRepository, useClass: AppointmentRepository },
-        // Provide ISupplierRepository binding, assuming SupplierRepository exists
-        // This is crucial as use cases depend on ISupplierRepository.
-        // If a SupplierModule is supposed to provide this, it should be imported instead.
-        { provide: ISupplierRepository, useClass: SupplierRepository },
-
+        // Ya no proporcionamos ISupplierRepository aquí, lo usamos del SupplierModule
+        
         EmailService, // Provide EmailService here if not imported from a dedicated EmailModule
         ImageProcessingPipe, // Pipe used by VisitorController
     ],

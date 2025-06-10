@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import {
   CreateSupplierDto,
   UpdateSupplierDto,
@@ -17,6 +17,7 @@ export class SupplierService {
     private readonly supplierRepository: Repository<Supplier>,
     @InjectRepository(SupplierSubscription)
     private readonly subscriptionRepository: Repository<SupplierSubscription>,
+    @Inject(forwardRef(() => EmployeeService))
     private readonly employeeService: EmployeeService,
     private readonly emailService: EmailService,
     private readonly logger: StructuredLoggerService, // Added logger
@@ -251,7 +252,7 @@ export class SupplierService {
   async updateProfileImageUrl(id: string, imageUrl: string) {
     const supplier = await this.supplierRepository.findOneBy({ id });
     if (!supplier) {
-      // this.logger.warn('Supplier profile image update failed: Supplier not found', { supplierId: id });
+      // this.logger.warn('Supplier profile image update failed: Supplier not found', undefined, JSON.stringify({ supplierId: id }));
       throw new BadRequestException('El proveedor no existe');
     }
 

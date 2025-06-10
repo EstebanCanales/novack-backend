@@ -222,7 +222,11 @@ describe('SupplierService', () => {
     });
 
     it('should log a warning if sending supplier creation email fails', async () => {
-      jest.spyOn(supplierRepository, 'findOne').mockResolvedValue(null);
+      // Primero mockea la primera llamada a findOne que verifica si existe un proveedor con ese nombre
+      jest.spyOn(supplierRepository, 'findOne')
+        .mockResolvedValueOnce(null) // Para la verificación de nombre existente
+        .mockResolvedValueOnce(mockSupplier as any); // Para la llamada a findOne al final del método
+      
       jest.spyOn(supplierRepository, 'create').mockReturnValue(mockSupplier as any);
       jest.spyOn(supplierRepository, 'save').mockResolvedValue(mockSupplier as any);
       jest.spyOn(subscriptionRepository, 'create').mockReturnValue(mockSubscription as any);

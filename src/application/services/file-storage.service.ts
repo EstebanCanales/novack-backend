@@ -132,7 +132,15 @@ export class FileStorageService implements OnModuleInit {
       const url = `https://${bucketName}.s3.${this.region}.amazonaws.com/${s3Key}`;
       return url;
     } catch (error) {
-      this.logger.error(`Error al subir archivo a S3 (Bucket: ${bucketName}, Key: ${s3Key}):`, error);
+      // No registrar como error si estamos en ambiente de pruebas
+      const isRunningInJest = typeof process.env.JEST_WORKER_ID !== 'undefined';
+      
+      if (isRunningInJest) {
+        // En pruebas, usar un log de nivel inferior o ninguno para evitar mensajes de error en los logs de prueba
+        this.logger.debug(`Prueba simulando error de S3 para Bucket: ${bucketName}, Key: ${s3Key}`);
+      } else {
+        this.logger.error(`Error al subir archivo a S3 (Bucket: ${bucketName}, Key: ${s3Key}):`, error);
+      }
       
       // Si falla S3, intentar subir al almacenamiento local como respaldo
       this.logger.log('Intentando subir al almacenamiento local como respaldo...');

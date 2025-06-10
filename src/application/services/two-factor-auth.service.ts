@@ -54,12 +54,12 @@ export class TwoFactorAuthService {
    * Genera un secreto de autenticación de dos factores
    */
   async generateTwoFactorSecret(employeeId: string, method: 'totp' | 'email' = 'totp'): Promise<{ secret: string; qrCodeUrl: string }> {
-    this.logger.log('2FA secret generation initiated', { employeeId });
+    this.logger.log('2FA secret generation initiated', undefined, JSON.stringify({ employeeId }));
     const employee = await this.employeeRepository.findById(employeeId);
     
     if (!employee) {
       // Log before throwing, though GlobalExceptionFilter would also catch this.
-      // this.logger.warn('2FA secret generation failed: Employee not found', { employeeId });
+      // this.logger.warn('2FA secret generation failed: Employee not found', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('Empleado no encontrado');
     }
 
@@ -77,7 +77,7 @@ export class TwoFactorAuthService {
     // Generar QR code como data URL
     const qrCodeUrl = await toDataURL(otpAuthUrl);
     
-    this.logger.log('2FA secret generated successfully', { employeeId });
+    this.logger.log('2FA secret generated successfully', undefined, JSON.stringify({ employeeId }));
     return {
       secret,
       qrCodeUrl,
@@ -88,16 +88,16 @@ export class TwoFactorAuthService {
    * Activa la autenticación de dos factores
    */
   async enableTwoFactor(employeeId: string, token: string): Promise<boolean> {
-    this.logger.log('Attempting to enable 2FA', { employeeId });
+    this.logger.log('Attempting to enable 2FA', undefined, JSON.stringify({ employeeId }));
     const employee = await this.employeeRepository.findById(employeeId);
     
     if (!employee || !employee.credentials) {
-      // this.logger.warn('2FA enabling failed: Employee or credentials not found', { employeeId });
+      // this.logger.warn('2FA enabling failed: Employee or credentials not found', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('Empleado no encontrado');
     }
     
     if (!employee.credentials.two_factor_secret) {
-      // this.logger.warn('2FA enabling failed: 2FA secret not generated', { employeeId });
+      // this.logger.warn('2FA enabling failed: 2FA secret not generated', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('No hay secreto generado para 2FA');
     }
     
@@ -105,7 +105,7 @@ export class TwoFactorAuthService {
     const isValid = this.verifyToken(employee.credentials.two_factor_secret, token);
     
     if (!isValid) {
-      this.logger.warn('2FA enabling failed: Invalid token', { employeeId });
+      this.logger.warn('2FA enabling failed: Invalid token', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('Token inválido');
     }
     
@@ -114,7 +114,7 @@ export class TwoFactorAuthService {
       two_factor_enabled: true,
     });
     
-    this.logger.log('2FA enabled successfully', { employeeId });
+    this.logger.log('2FA enabled successfully', undefined, JSON.stringify({ employeeId }));
     return true;
   }
 
@@ -122,16 +122,16 @@ export class TwoFactorAuthService {
    * Desactiva la autenticación de dos factores
    */
   async disableTwoFactor(employeeId: string, token: string): Promise<boolean> {
-    this.logger.log('Attempting to disable 2FA', { employeeId });
+    this.logger.log('Attempting to disable 2FA', undefined, JSON.stringify({ employeeId }));
     const employee = await this.employeeRepository.findById(employeeId);
     
     if (!employee || !employee.credentials) {
-      // this.logger.warn('2FA disabling failed: Employee or credentials not found', { employeeId });
+      // this.logger.warn('2FA disabling failed: Employee or credentials not found', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('Empleado no encontrado');
     }
     
     if (!employee.credentials.two_factor_enabled) {
-      // this.logger.warn('2FA disabling failed: 2FA not currently enabled', { employeeId });
+      // this.logger.warn('2FA disabling failed: 2FA not currently enabled', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('La autenticación de dos factores no está activada');
     }
     
@@ -141,7 +141,7 @@ export class TwoFactorAuthService {
     const isValid = this.verifyToken(employee.credentials.two_factor_secret, token);
     
     if (!isValid) {
-      this.logger.warn('2FA disabling failed: Invalid token', { employeeId });
+      this.logger.warn('2FA disabling failed: Invalid token', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('Token inválido');
     }
     
@@ -151,7 +151,7 @@ export class TwoFactorAuthService {
       two_factor_secret: null, // Clear the secret when disabling
     });
     
-    this.logger.log('2FA disabled successfully', { employeeId });
+    this.logger.log('2FA disabled successfully', undefined, JSON.stringify({ employeeId }));
     return true;
   }
 
@@ -168,22 +168,22 @@ export class TwoFactorAuthService {
    * Valida el token 2FA durante el proceso de login
    */
   async validateTwoFactorToken(employeeId: string, token: string): Promise<boolean> {
-    this.logger.log('Validating 2FA token for login', { employeeId });
+    this.logger.log('Validating 2FA token for login', undefined, JSON.stringify({ employeeId }));
     const employee = await this.employeeRepository.findById(employeeId);
     
     if (!employee || !employee.credentials) {
-      // this.logger.warn('2FA token validation failed: Employee or credentials not found', { employeeId });
+      // this.logger.warn('2FA token validation failed: Employee or credentials not found', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('Empleado no encontrado');
     }
     
     if (!employee.credentials.two_factor_enabled) {
       // Si 2FA no está habilitado, no se necesita token. Consideramos validación exitosa en este contexto.
-      this.logger.log('2FA token validation skipped: 2FA not enabled for user', { employeeId });
+      this.logger.log('2FA token validation skipped: 2FA not enabled for user', undefined, JSON.stringify({ employeeId }));
       return true;
     }
     
     if (!employee.credentials.two_factor_secret) {
-      // this.logger.error('2FA token validation failed: 2FA secret missing for enabled user', { employeeId });
+      // this.logger.error('2FA token validation failed: 2FA secret missing for enabled user', undefined, JSON.stringify({ employeeId }));
       // This state (enabled but no secret) should ideally not happen.
       throw new BadRequestException('Configuración 2FA incompleta');
     }
@@ -191,9 +191,9 @@ export class TwoFactorAuthService {
     // Verificar el token proporcionado
     const isValid = this.verifyToken(employee.credentials.two_factor_secret, token);
     if (isValid) {
-      this.logger.info('2FA token validation successful', { employeeId });
+      this.logger.log('2FA token validation successful', undefined, JSON.stringify({ employeeId }));
     } else {
-      this.logger.warn('2FA token validation failed', { employeeId });
+      this.logger.warn('2FA token validation failed', undefined, JSON.stringify({ employeeId }));
     }
     return isValid;
   }
@@ -208,7 +208,7 @@ export class TwoFactorAuthService {
     const employee = await this.employeeRepository.findById(employeeId);
     
     if (!employee || !employee.credentials || !employee.credentials.two_factor_enabled) {
-      // this.logger.warn('2FA backup code generation failed: 2FA not enabled or bad state', { employeeId });
+      // this.logger.warn('2FA backup code generation failed: 2FA not enabled or bad state', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('2FA no está activado para este empleado');
     }
 
@@ -228,7 +228,7 @@ export class TwoFactorAuthService {
       backup_codes: backupCodes,
     });
     
-    this.logger.log('2FA backup code generated', { employeeId });
+    this.logger.log('2FA backup code generated', undefined, JSON.stringify({ employeeId }));
     return backupCode;
   }
   
@@ -239,11 +239,11 @@ export class TwoFactorAuthService {
    * @returns true si es válido, false si no
    */
   async verifyBackupCode(employeeId: string, code: string): Promise<boolean> {
-    this.logger.log('Attempting to verify 2FA backup code', { employeeId });
+    this.logger.log('Attempting to verify 2FA backup code', undefined, JSON.stringify({ employeeId }));
     const employee = await this.employeeRepository.findById(employeeId);
     
     if (!employee || !employee.credentials || !employee.credentials.two_factor_enabled || !employee.credentials.backup_codes) {
-      this.logger.warn('2FA backup code verification failed: Pre-conditions not met (2FA not enabled, no codes, or no employee)', { employeeId, code });
+      this.logger.warn('2FA backup code verification failed: Pre-conditions not met (2FA not enabled, no codes, or no employee)', undefined, JSON.stringify({ employeeId, code }));
       return false;
     }
     
@@ -254,7 +254,7 @@ export class TwoFactorAuthService {
     );
     
     if (backupCodeIndex === -1) {
-      this.logger.warn('2FA backup code verification failed: Code not found or already used', { employeeId, code });
+      this.logger.warn('2FA backup code verification failed: Code not found or already used', undefined, JSON.stringify({ employeeId, code }));
       return false;
     }
     
@@ -267,7 +267,7 @@ export class TwoFactorAuthService {
       backup_codes: backupCodes,
     });
     
-    this.logger.log('2FA backup code verified and used successfully', { employeeId, code });
+    this.logger.log('2FA backup code verified and used successfully', undefined, JSON.stringify({ employeeId, code }));
     return true;
   }
 
@@ -279,7 +279,7 @@ export class TwoFactorAuthService {
     // Logging is done by the aliased method `enableTwoFactor`
     // If separate logging for alias usage is desired, it can be added here.
     // For now, assuming logging in core methods is sufficient.
-    // this.logger.log('Attempting to enable 2FA (via alias)', { employeeId });
+    // this.logger.log('Attempting to enable 2FA (via alias)', undefined, JSON.stringify({ employeeId }));
     return this.enableTwoFactor(employeeId, token);
   }
 
@@ -288,7 +288,7 @@ export class TwoFactorAuthService {
    * Alias para disableTwoFactor para mantener compatibilidad con el controlador
    */
   async disable2FA(employeeId: string, token: string): Promise<boolean> {
-    // this.logger.log('Attempting to disable 2FA (via alias)', { employeeId });
+    // this.logger.log('Attempting to disable 2FA (via alias)', undefined, JSON.stringify({ employeeId }));
     return this.disableTwoFactor(employeeId, token);
   }
 
@@ -297,17 +297,17 @@ export class TwoFactorAuthService {
    * Alias para validateTwoFactorToken para mantener compatibilidad con el controlador
    */
   async verify2FA(employeeId: string, token: string): Promise<boolean> {
-    // this.logger.log('Validating 2FA token for login (via alias)', { employeeId });
+    // this.logger.log('Validating 2FA token for login (via alias)', undefined, JSON.stringify({ employeeId }));
     return this.validateTwoFactorToken(employeeId, token);
   }
 
   // --- SMS 2FA Methods ---
 
   async initiateSmsVerification(employeeId: string, phoneNumber: string): Promise<void> {
-    this.logger.log('Initiating SMS phone verification', { employeeId, phoneNumber });
+    this.logger.log('Initiating SMS phone verification', undefined, JSON.stringify({ employeeId, phoneNumber }));
     const employee = await this.employeeRepository.findById(employeeId);
     if (!employee) {
-      this.logger.warn('Failed to initiate SMS verification: Employee not found', { employeeId });
+      this.logger.warn('Failed to initiate SMS verification: Employee not found', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('Empleado no encontrado');
     }
 
@@ -328,27 +328,27 @@ export class TwoFactorAuthService {
     });
 
     await this.smsService.sendOtp(phoneNumber, otp); // Assumes phoneNumber is E.164 formatted
-    this.logger.log('SMS OTP sent for phone verification', { employeeId, phoneNumber });
+    this.logger.log('SMS OTP sent for phone verification', undefined, JSON.stringify({ employeeId, phoneNumber }));
   }
 
   async verifySmsOtpForPhoneNumber(employeeId: string, otp: string): Promise<boolean> {
-    this.logger.log('Attempting to verify SMS OTP for phone number', { employeeId });
+    this.logger.log('Attempting to verify SMS OTP for phone number', undefined, JSON.stringify({ employeeId }));
     const employee = await this.employeeRepository.findByIdWithCredentials(employeeId); // Ensure this method exists and fetches credentials
 
     if (!employee || !employee.credentials) {
-      this.logger.warn('SMS OTP verification failed: Employee or credentials not found', { employeeId });
+      this.logger.warn('SMS OTP verification failed: Employee or credentials not found', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('Empleado o credenciales no encontradas.');
     }
 
     const { sms_otp_code: storedOtp, sms_otp_code_expires_at: expiry } = employee.credentials;
 
     if (!storedOtp || !expiry) {
-      this.logger.warn('SMS OTP verification failed: No OTP pending or already verified', { employeeId });
+      this.logger.warn('SMS OTP verification failed: No OTP pending or already verified', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('No hay código OTP pendiente para verificación o ya ha sido verificado.');
     }
 
     if (expiry < new Date()) {
-      this.logger.warn('SMS OTP verification failed: OTP has expired', { employeeId });
+      this.logger.warn('SMS OTP verification failed: OTP has expired', undefined, JSON.stringify({ employeeId }));
       // Clear the expired OTP
       await this.employeeRepository.updateCredentials(employeeId, {
         sms_otp_code: null,
@@ -358,7 +358,7 @@ export class TwoFactorAuthService {
     }
 
     if (storedOtp !== otp) {
-      this.logger.warn('SMS OTP verification failed: Invalid OTP', { employeeId });
+      this.logger.warn('SMS OTP verification failed: Invalid OTP', undefined, JSON.stringify({ employeeId }));
       // Consider implementing attempt counting here to prevent brute-force attacks.
       throw new BadRequestException('Código OTP inválido.');
     }
@@ -369,42 +369,42 @@ export class TwoFactorAuthService {
       sms_otp_code: null,
       sms_otp_code_expires_at: null,
     });
-    this.logger.log('SMS OTP for phone number verified successfully', { employeeId });
+    this.logger.log('SMS OTP for phone number verified successfully', undefined, JSON.stringify({ employeeId }));
     return true;
   }
 
   async enableSmsTwoFactor(employeeId: string): Promise<boolean> {
-    this.logger.log('Attempting to enable SMS 2FA', { employeeId });
+    this.logger.log('Attempting to enable SMS 2FA', undefined, JSON.stringify({ employeeId }));
     const employee = await this.employeeRepository.findByIdWithCredentials(employeeId);
 
     if (!employee || !employee.credentials) {
-      this.logger.warn('Enable SMS 2FA failed: Employee or credentials not found', { employeeId });
+      this.logger.warn('Enable SMS 2FA failed: Employee or credentials not found', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('Empleado o credenciales no encontradas.');
     }
 
     if (!employee.credentials.phone_number_verified) {
-      this.logger.warn('Enable SMS 2FA failed: Phone number not verified', { employeeId });
+      this.logger.warn('Enable SMS 2FA failed: Phone number not verified', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('El número de teléfono debe ser verificado antes de habilitar SMS 2FA.');
     }
 
     await this.employeeRepository.updateCredentials(employeeId, {
       is_sms_2fa_enabled: true
     });
-    this.logger.log('SMS 2FA enabled successfully', { employeeId });
+    this.logger.log('SMS 2FA enabled successfully', undefined, JSON.stringify({ employeeId }));
     return true;
   }
 
   async disableSmsTwoFactor(employeeId: string): Promise<boolean> {
-    this.logger.log('Attempting to disable SMS 2FA', { employeeId });
+    this.logger.log('Attempting to disable SMS 2FA', undefined, JSON.stringify({ employeeId }));
     const employee = await this.employeeRepository.findByIdWithCredentials(employeeId);
 
     if (!employee || !employee.credentials) {
-      this.logger.warn('Disable SMS 2FA failed: Employee or credentials not found', { employeeId });
+      this.logger.warn('Disable SMS 2FA failed: Employee or credentials not found', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('Empleado o credenciales no encontradas.');
     }
 
     if (!employee.credentials.is_sms_2fa_enabled) {
-      this.logger.warn('Disable SMS 2FA failed: SMS 2FA not currently enabled', { employeeId });
+      this.logger.warn('Disable SMS 2FA failed: SMS 2FA not currently enabled', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('SMS 2FA no está habilitado actualmente.');
     }
 
@@ -414,7 +414,7 @@ export class TwoFactorAuthService {
       // sms_otp_code: null,
       // sms_otp_code_expires_at: null,
     });
-    this.logger.log('SMS 2FA disabled successfully', { employeeId });
+    this.logger.log('SMS 2FA disabled successfully', undefined, JSON.stringify({ employeeId }));
     return true;
   }
 }

@@ -5,13 +5,13 @@ import { UnauthorizedException } from '@nestjs/common';
 import { LoginDto, LoginSmsVerifyDto } from 'src/application/dtos/auth/login.dto'; // LoginSmsVerifyDto was also missing
 import { RefreshTokenDto } from 'src/application/dtos/auth/refresh-token.dto';
 import { LogoutDto } from 'src/application/dtos/auth/logout.dto';
-// AuthenticateEmployeeUseCase import removed as it's not directly used by AuthController
+import { AuthenticateEmployeeUseCase } from 'src/application/use-cases/auth/authenticate-employee.use-case';
 
 
 describe('AuthController', () => {
   let controller: AuthController;
   let mockAuthService: Partial<AuthService>;
-  // mockAuthenticateEmployeeUseCase removed
+  let mockAuthenticateEmployeeUseCase: Partial<AuthenticateEmployeeUseCase>;
 
   // Define a comprehensive mock request object at the top level of the describe block
   const mockRequestBase = {
@@ -63,13 +63,15 @@ describe('AuthController', () => {
       verifySmsOtpAndLogin: jest.fn(),
     };
 
-    // mockAuthenticateEmployeeUseCase initialization removed
+    mockAuthenticateEmployeeUseCase = {
+      execute: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
         { provide: AuthService, useValue: mockAuthService },
-        // AuthenticateEmployeeUseCase provider removed
+        { provide: AuthenticateEmployeeUseCase, useValue: mockAuthenticateEmployeeUseCase },
       ],
     }).compile();
 
@@ -101,19 +103,19 @@ describe('AuthController', () => {
     };
 
     it('should return token and employee data on successful login', async () => {
-      (mockAuthService.login as jest.Mock).mockResolvedValueOnce(mockResponse);
+      (mockAuthenticateEmployeeUseCase.execute as jest.Mock).mockResolvedValueOnce(mockResponse);
       const req = { ...mockRequestBase, body: loginDto, url: '/auth/login', method: 'POST' };
 
       const result = await controller.login(loginDto, req);
 
       expect(result).toEqual(mockResponse);
-      expect(mockAuthService.login).toHaveBeenCalledWith(loginDto.email, loginDto.password, req);
+      expect(mockAuthenticateEmployeeUseCase.execute).toHaveBeenCalledWith(loginDto, req);
     });
 
     it('should throw UnauthorizedException on login failure', async () => {
       const errorMessage = 'Credenciales inválidas';
       const error = new UnauthorizedException(errorMessage);
-      (mockAuthService.login as jest.Mock).mockRejectedValueOnce(error);
+      (mockAuthenticateEmployeeUseCase.execute as jest.Mock).mockRejectedValueOnce(error);
       const req = { ...mockRequestBase, body: loginDto, url: '/auth/login', method: 'POST' };
 
       // En este caso, necesitamos usar un único expect y guardar la promesa para que el test no la resuelva antes de tiempo

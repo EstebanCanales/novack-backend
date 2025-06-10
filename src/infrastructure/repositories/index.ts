@@ -9,8 +9,8 @@
 export * from './employee.repository';
 export * from './visitor.repository'; // Added export
 export * from './appointment.repository'; // Added export
+export * from './supplier.repository'; // Exportando el repositorio de proveedores
 // Otros repositorios se añadirán a medida que se implementen
-// export * from './supplier.repository'; // Example for when it's created
 // export * from './card.repository'; // Example for when it's created
 
 
@@ -20,12 +20,13 @@ export * from './appointment.repository'; // Added export
 import { EmployeeRepository } from './employee.repository';
 import { VisitorRepository } from './visitor.repository'; // Added import
 import { AppointmentRepository } from './appointment.repository'; // Added import
+import { SupplierRepository } from './supplier.repository'; // Importando el repositorio de proveedores
 
 export const REPOSITORIES = [
   EmployeeRepository,
   VisitorRepository, // Added to array
   AppointmentRepository, // Added to array
+  SupplierRepository, // Añadido al array
   // Agregar otros repositorios aquí
-  // SupplierRepository,
   // CardRepository,
 ];

@@ -297,12 +297,21 @@ describe('CreateVisitorAndAppointmentUseCase', () => {
 
     it('should throw NotFoundException if final re-fetch of visitor fails', async () => {
       // All previous steps succeed
-      mockVisitorRepository.findById.mockResolvedValueOnce(mockSavedVisitor) // Initial save implies it exists for a moment
-                                   .mockResolvedValueOnce(null); // Then re-fetch fails
+      mockSupplierRepository.findById.mockResolvedValue(mockSupplier);
+      mockVisitorRepository.create.mockReturnValue(mockVisitorInstance);
+      mockVisitorRepository.save.mockResolvedValue(mockSavedVisitor);
+      mockAppointmentRepository.create.mockReturnValue(mockAppointmentInstance);
+      mockAppointmentRepository.save.mockResolvedValue(mockSavedAppointment);
+      mockEmailService.sendVisitorWelcomeEmail.mockResolvedValue({id: 'email-send-id'} as any);
+      mockCardService.findAvailableCards.mockResolvedValue([{ id: 'card-uuid' } as any]);
+      mockCardService.assignToVisitor.mockResolvedValue(undefined as any);
+      
+      mockVisitorRepository.findById.mockResolvedValue(null);
 
       await expect(useCase.execute(createVisitorDto)).rejects.toThrow(NotFoundException);
       expect(mockLoggerService.error).toHaveBeenCalledWith(
         'Failed to re-fetch visitor after creation, though creation was successful.',
+        undefined,
         undefined,
         { visitorId: mockSavedVisitor.id }
       );

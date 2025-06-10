@@ -13,6 +13,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
@@ -262,8 +263,8 @@ export class VisitorController {
 
     const bucketName = this.configService.get<string>('AWS_S3_VISITOR_BUCKET_NAME');
     if (!bucketName) {
-      // Consider throwing a ServiceUnavailableException or InternalServerErrorException for config issues
-      this.fileStorageService.logger.error('AWS_S3_VISITOR_BUCKET_NAME not configured'); // Assuming fileStorageService has a logger
+      // En lugar de acceder al logger directamente, registramos el error con console.log
+      console.error('AWS_S3_VISITOR_BUCKET_NAME not configured');
       throw new InternalServerErrorException('Error de configuración del almacenamiento de archivos.');
     }
 

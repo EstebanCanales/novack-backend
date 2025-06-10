@@ -26,12 +26,12 @@ export class EmailVerificationService {
     const employee = await this.employeeRepository.findById(employeeId);
     
     if (!employee) {
-      this.logger.warn('Failed to generate email verification token: Employee not found', { employeeId });
+      this.logger.warn('Failed to generate email verification token: Employee not found', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('Empleado no encontrado');
     }
 
     if (employee.credentials?.is_email_verified) {
-      this.logger.warn('Failed to generate email verification token: Email already verified', { employeeId });
+      this.logger.warn('Failed to generate email verification token: Email already verified', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('El email ya está verificado');
     }
 
@@ -48,7 +48,7 @@ export class EmailVerificationService {
       reset_token_expires: expiresAt,
     });
     
-    this.logger.log('Email verification token generated', { employeeId });
+    this.logger.log('Email verification token generated', undefined, JSON.stringify({ employeeId }));
     return verificationToken;
   }
 
@@ -56,16 +56,16 @@ export class EmailVerificationService {
    * Envía un email de verificación al empleado
    */
   async sendVerificationEmail(employeeId: string): Promise<boolean> {
-    this.logger.log('Attempting to send verification email', { employeeId });
+    this.logger.log('Attempting to send verification email', undefined, JSON.stringify({ employeeId }));
     const employee = await this.employeeRepository.findById(employeeId);
     
     if (!employee) {
-      this.logger.warn('Failed to send verification email: Employee not found', { employeeId });
+      this.logger.warn('Failed to send verification email: Employee not found', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('Empleado no encontrado');
     }
 
     if (employee.credentials?.is_email_verified) {
-      this.logger.warn('Failed to send verification email: Email already verified', { employeeId });
+      this.logger.warn('Failed to send verification email: Email already verified', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('El email ya está verificado');
     }
     
@@ -83,9 +83,9 @@ export class EmailVerificationService {
         `${employee.first_name} ${employee.last_name}`,
         verificationUrl,
       );
-      this.logger.log('Verification email dispatch request successful', { employeeId, email: employee.email });
+      this.logger.log('Verification email dispatch request successful', undefined, JSON.stringify({ employeeId, email: employee.email }));
     } catch (error) {
-      this.logger.error('Failed to send verification email due to EmailService error', { employeeId, email: employee.email, error: error.message });
+      this.logger.error('Failed to send verification email due to EmailService error', undefined, JSON.stringify({ employeeId, email: employee.email, error: error.message }));
       throw error; // Re-throw the original error from EmailService
     }
     
@@ -96,17 +96,17 @@ export class EmailVerificationService {
    * Reenvía un email de verificación al empleado
    */
   async resendVerificationEmail(employeeId: string): Promise<boolean> {
-    this.logger.log('Attempting to resend verification email', { employeeId });
+    this.logger.log('Attempting to resend verification email', undefined, JSON.stringify({ employeeId }));
     const employee = await this.employeeRepository.findById(employeeId);
     
     if (!employee) {
       // Logged by called methods or should be logged here too if direct throw
-      this.logger.warn('Failed to resend verification email: Employee not found', { employeeId });
+      this.logger.warn('Failed to resend verification email: Employee not found', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('Empleado no encontrado');
     }
 
     if (employee.credentials?.is_email_verified) {
-      this.logger.warn('Failed to resend verification email: Email already verified', { employeeId });
+      this.logger.warn('Failed to resend verification email: Email already verified', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('El email ya está verificado');
     }
     
@@ -116,7 +116,7 @@ export class EmailVerificationService {
         verification_token: null,
         reset_token_expires: null,
       });
-      this.logger.log('Cleared previous verification token', { employeeId });
+      this.logger.log('Cleared previous verification token', undefined, JSON.stringify({ employeeId }));
     }
     
     // Generar nuevo token y enviar email
@@ -127,17 +127,17 @@ export class EmailVerificationService {
    * Verifica un token de verificación de email
    */
   async verifyEmail(token: string): Promise<boolean> {
-    this.logger.log('Attempting to verify email with token', { token }); // Avoid logging full token in prod if sensitive
+    this.logger.log('Attempting to verify email with token', undefined, JSON.stringify({ token })); // Avoid logging full token in prod if sensitive
     const employee = await this.employeeRepository.findByVerificationToken(token);
     
     if (!employee || !employee.credentials) {
-      this.logger.warn('Email verification failed: Token invalid or expired (employee not found)', { token });
+      this.logger.warn('Email verification failed: Token invalid or expired (employee not found)', undefined, JSON.stringify({ token }));
       throw new BadRequestException('Token inválido o expirado');
     }
     
     const now = new Date();
     if (employee.credentials.reset_token_expires && employee.credentials.reset_token_expires < now) {
-      this.logger.warn('Email verification failed: Token expired', { token, employeeId: employee.id });
+      this.logger.warn('Email verification failed: Token expired', undefined, JSON.stringify({ token, employeeId: employee.id }));
       throw new BadRequestException('El token ha expirado');
     }
     
@@ -148,7 +148,7 @@ export class EmailVerificationService {
       reset_token_expires: null,
     });
     
-    this.logger.log('Email successfully verified', { employeeId: employee.id, email: employee.email });
+    this.logger.log('Email successfully verified', undefined, JSON.stringify({ employeeId: employee.id, email: employee.email }));
     return true;
   }
 
@@ -163,12 +163,12 @@ export class EmailVerificationService {
       // If an error, GlobalExceptionFilter will handle it.
       // For a simple check, throwing might be too much.
       // However, to align with other methods, we'll log and throw.
-      this.logger.warn('isEmailVerified check failed: Employee not found', { employeeId });
+      this.logger.warn('isEmailVerified check failed: Employee not found', undefined, JSON.stringify({ employeeId }));
       throw new BadRequestException('Empleado no encontrado');
     }
     
     const isVerified = !!employee.credentials?.is_email_verified;
-    this.logger.debug('Checked email verification status', { employeeId, isVerified });
+    this.logger.debug('Checked email verification status', undefined, JSON.stringify({ employeeId, isVerified }));
     return isVerified;
   }
 }

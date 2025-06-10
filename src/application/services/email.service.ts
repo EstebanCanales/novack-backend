@@ -80,7 +80,7 @@ export class EmailService {
       });
 
       if (error) {
-        this.logger.error('Failed to send supplier creation email', undefined, error.stack, { originalError: error.message, to: email, supplierId: supplier.id });
+        this.logger.error('Failed to send supplier creation email', undefined, JSON.stringify(error), { originalError: error.message, to: email, supplierId: supplier.id });
         throw new InternalServerErrorException(`Failed to send email: ${error.message}`);
       }
 
@@ -89,7 +89,7 @@ export class EmailService {
 
     } catch (e) {
       // Catch errors from getEmailHtml or other synchronous parts, or re-thrown errors
-      this.logger.error(`Error in sendSupplierCreationEmail process for template ${templateName}`, undefined, e.stack, { originalError: e.message, to: email, supplierId: supplier.id });
+      this.logger.error(`Error in sendSupplierCreationEmail process for template ${templateName}`, undefined, e.stack || JSON.stringify(e), { originalError: e.message, to: email, supplierId: supplier.id });
       if (e instanceof BadRequestException || e instanceof InternalServerErrorException) {
         throw e; // Re-throw if it's already one of our handled types
       }
@@ -129,7 +129,7 @@ export class EmailService {
       });
 
       if (error) {
-        this.logger.error('Failed to send supplier update email', undefined, error.stack, { originalError: error.message, to: supplier.contact_email, supplierId: supplier.id });
+        this.logger.error('Failed to send supplier update email', undefined, JSON.stringify(error), { originalError: error.message, to: supplier.contact_email, supplierId: supplier.id });
         throw new InternalServerErrorException(`Failed to send email: ${error.message}`);
       }
 
@@ -137,7 +137,7 @@ export class EmailService {
       return data;
 
     } catch (e) {
-      this.logger.error(`Error in sendSupplierUpdateEmail process for template ${templateName}`, undefined, e.stack, { originalError: e.message, to: supplier.contact_email, supplierId: supplier.id });
+      this.logger.error(`Error in sendSupplierUpdateEmail process for template ${templateName}`, undefined, e.stack || JSON.stringify(e), { originalError: e.message, to: supplier.contact_email, supplierId: supplier.id });
       if (e instanceof BadRequestException || e instanceof InternalServerErrorException) {
         throw e;
       }
@@ -186,14 +186,14 @@ export class EmailService {
       });
 
       if (error) {
-        this.logger.error('Failed to send visitor welcome email', undefined, error.stack, { originalError: error.message, to });
+        this.logger.error('Failed to send visitor welcome email', undefined, JSON.stringify(error), { originalError: error.message, to });
         throw new InternalServerErrorException(`Failed to send email: ${error.message}`);
       }
       this.logger.log('Visitor welcome email sent successfully', undefined, { to });
       return data;
 
     } catch (e) {
-      this.logger.error(`Error in sendVisitorWelcomeEmail process for template ${templateName}`, undefined, e.stack, { originalError: e.message, to });
+      this.logger.error(`Error in sendVisitorWelcomeEmail process for template ${templateName}`, undefined, e.stack || JSON.stringify(e), { originalError: e.message, to });
       if (e instanceof InternalServerErrorException) {
         throw e;
       }
@@ -235,14 +235,14 @@ export class EmailService {
       });
 
       if (error) {
-        this.logger.error('Failed to send visitor checkout email', undefined, error.stack, { originalError: error.message, to });
+        this.logger.error('Failed to send visitor checkout email', undefined, JSON.stringify(error), { originalError: error.message, to });
         throw new InternalServerErrorException(`Failed to send email: ${error.message}`);
       }
       this.logger.log('Visitor checkout email sent successfully', undefined, { to });
       return data;
 
     } catch (e) {
-      this.logger.error(`Error in sendVisitorCheckoutEmail process for template ${templateName}`, undefined, e.stack, { originalError: e.message, to });
+      this.logger.error(`Error in sendVisitorCheckoutEmail process for template ${templateName}`, undefined, e.stack || JSON.stringify(e), { originalError: e.message, to });
       if (e instanceof InternalServerErrorException) {
         throw e;
       }
@@ -274,14 +274,14 @@ export class EmailService {
       });
 
       if (error) {
-        this.logger.error('Failed to send 2FA setup email', undefined, error.stack, { originalError: error.message, to });
+        this.logger.error('Failed to send 2FA setup email', undefined, JSON.stringify(error), { originalError: error.message, to });
         throw new InternalServerErrorException(`Failed to send email: ${error.message}`);
       }
       this.logger.log('2FA setup email sent successfully', undefined, { to });
       return data;
 
     } catch (e) {
-      this.logger.error(`Error in send2FASetupEmail process for template ${templateName}`, undefined, e.stack, { originalError: e.message, to });
+      this.logger.error(`Error in send2FASetupEmail process for template ${templateName}`, undefined, e.stack || JSON.stringify(e), { originalError: e.message, to });
       if (e instanceof InternalServerErrorException) {
         throw e;
       }
@@ -317,15 +317,15 @@ export class EmailService {
       });
 
       if (error) {
-        this.logger.error('Failed to send email verification', undefined, error.stack, { originalError: error.message, to, verificationToken });
-        throw new InternalServerErrorException(`Failed to send email: ${error.message}`);
+        this.logger.error('Failed to send email verification', undefined, JSON.stringify(error), { originalError: error.message, to, verificationToken });
+        throw new InternalServerErrorException(`Failed to send email verification: ${error.message}`);
       }
 
       this.logger.log('Email verification sent successfully', undefined, { to, verificationToken });
       return data;
 
     } catch (e) {
-      this.logger.error(`Error in sendEmailVerification process for template ${templateName}`, undefined, e.stack, { originalError: e.message, to, verificationToken });
+      this.logger.error(`Error in sendEmailVerification process for template ${templateName}`, undefined, e.stack || JSON.stringify(e), { originalError: e.message, to });
       if (e instanceof InternalServerErrorException) {
         throw e;
       }
@@ -354,15 +354,15 @@ export class EmailService {
       });
 
       if (error) {
-        this.logger.error('Failed to send email verification success notification', undefined, error.stack, { originalError: error.message, to });
-        throw new InternalServerErrorException(`Failed to send email: ${error.message}`);
+        this.logger.error('Failed to send email verification success notification', undefined, JSON.stringify(error), { originalError: error.message, to });
+        throw new InternalServerErrorException(`Failed to send verification success email: ${error.message}`);
       }
 
       this.logger.log('Email verification success notification sent successfully', undefined, { to });
       return data;
 
     } catch (e) {
-      this.logger.error(`Error in sendEmailVerificationSuccess process for template ${templateName}`, undefined, e.stack, { originalError: e.message, to });
+      this.logger.error(`Error in sendEmailVerificationSuccess process for template ${templateName}`, undefined, e.stack || JSON.stringify(e), { originalError: e.message, to });
       if (e instanceof InternalServerErrorException) {
         throw e;
       }

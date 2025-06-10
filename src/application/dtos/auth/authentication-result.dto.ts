@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { EmployeeBasicDto } from 'src/application/dtos/employee/employee-basic.dto.ts'; // Adjusted path
+import { EmployeeBasicDto } from 'src/application/dtos/employee/employee-basic.dto'; // Corregida la ruta sin extensión .ts
 
 export class AuthenticationResultDto {
   @ApiProperty({ example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...', description: 'JWT Access Token' })

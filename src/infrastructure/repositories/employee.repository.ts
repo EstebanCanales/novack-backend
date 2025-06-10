@@ -41,6 +41,27 @@ export class EmployeeRepository implements IEmployeeRepository {
     });
   }
 
+  async findByEmailWithCredentialsAndPhone(email: string): Promise<Employee | null> {
+    return this.employeeEntityRepository.findOne({
+      where: { email },
+      relations: ['credentials']
+    });
+  }
+
+  async findByIdWithCredentialsAndPhone(id: string): Promise<Employee | null> {
+    return this.employeeEntityRepository.findOne({
+      where: { id },
+      relations: ['credentials']
+    });
+  }
+
+  async findByIdWithCredentials(id: string): Promise<Employee | null> {
+    return this.employeeEntityRepository.findOne({
+      where: { id },
+      relations: ['credentials']
+    });
+  }
+
   async create(employeeData: Partial<Employee>): Promise<Employee> {
     const newEmployee = this.employeeEntityRepository.create(employeeData);
     

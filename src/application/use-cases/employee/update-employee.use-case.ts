@@ -80,7 +80,7 @@ export class UpdateEmployeeUseCase {
     // 5. Re-fetch the entity to return the latest state
     const resultEmployee = await this.employeeRepository.findById(id);
     if (!resultEmployee) {
-        this.logger.error(`Failed to re-fetch employee after update for id: ${id}. This indicates a critical issue.`, undefined, { employeeId: id });
+        this.logger.error(`Failed to re-fetch employee after update for id: ${id}. This indicates a critical issue.`, undefined, JSON.stringify({ employeeId: id }));
         // This case should ideally not be reached if the 'id' is valid and the employee existed.
         // It might indicate a race condition or an issue with the update/find process.
         throw new NotFoundException(`Employee with ID "${id}" could not be found after update operations.`);

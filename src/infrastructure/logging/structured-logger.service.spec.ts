@@ -106,6 +106,16 @@ describe('StructuredLoggerService', () => {
     });
 
     it('should log "debug" messages when default level is "debug"', () => {
+      // Reiniciar las propiedades estáticas
+      Object.defineProperty(StructuredLoggerService, 'initialized', {
+        value: false,
+        writable: true
+      });
+      Object.defineProperty(StructuredLoggerService, 'defaultLogLevel', {
+        value: 'debug',
+        writable: true
+      });
+
       mockConfigService.get.mockImplementation((key: string) => {
         if (key === 'logging.level') return 'debug';
         if (key === 'logging.contextLogLevels') return {};
@@ -115,7 +125,13 @@ describe('StructuredLoggerService', () => {
       const debugService = new StructuredLoggerService(mockConfigService as any, mockLogTransportService as any);
       debugService.debug('Debug message');
       // expect(mockLogTransportService.sendLog).toHaveBeenCalledTimes(1); // This can be tricky if other logs happened
-      expect(mockLogTransportService.sendLog).toHaveBeenCalledWith(expect.objectContaining({ level: 'debug', message: 'Debug message' }));
+      expect(mockLogTransportService.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({ 
+          level: 'debug', 
+          message: 'Debug message',
+          context: 'Global'
+        })
+      );
     });
 
     it('should NOT log "debug" messages when default level is "info"', () => {
@@ -133,10 +149,27 @@ describe('StructuredLoggerService', () => {
     it('should log "error" messages when default level is "info"', () => {
       service.error('Error message', 'TestContext', 'trace details');
       // expect(mockLogTransportService.sendLog).toHaveBeenCalledTimes(1);
-      expect(mockLogTransportService.sendLog).toHaveBeenCalledWith(expect.objectContaining({ level: 'error', message: 'Error message', meta: expect.arrayContaining([expect.objectContaining({trace: 'trace details'})]) }));
+      expect(mockLogTransportService.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({ 
+          level: 'error', 
+          message: 'Error message',
+          context: 'TestContext',
+          stack_trace: 'trace details'
+        })
+      );
     });
 
     it('should log "verbose" messages if default level is "verbose"', () => {
+        // Reiniciar las propiedades estáticas
+        Object.defineProperty(StructuredLoggerService, 'initialized', {
+          value: false,
+          writable: true
+        });
+        Object.defineProperty(StructuredLoggerService, 'defaultLogLevel', {
+          value: 'verbose',
+          writable: true
+        });
+
         mockConfigService.get.mockImplementation((key: string) => {
             if (key === 'logging.level') return 'verbose';
             if (key === 'logging.contextLogLevels') return {};
@@ -144,7 +177,13 @@ describe('StructuredLoggerService', () => {
           });
         const verboseService = new StructuredLoggerService(mockConfigService as any, mockLogTransportService as any);
         verboseService.verbose('Verbose message');
-        expect(mockLogTransportService.sendLog).toHaveBeenCalledWith(expect.objectContaining({ level: 'verbose', message: 'Verbose message' }));
+        expect(mockLogTransportService.sendLog).toHaveBeenCalledWith(
+          expect.objectContaining({ 
+            level: 'verbose', 
+            message: 'Verbose message',
+            context: 'Global'
+          })
+        );
     });
 
     it('should NOT log "verbose" messages if default level is "info"', () => {
@@ -166,10 +205,26 @@ describe('StructuredLoggerService', () => {
     });
 
     it('should log "debug" for "SpecificContext" when its level is "debug" and global is "info"', () => {
+      // Reiniciar las propiedades estáticas
+      Object.defineProperty(StructuredLoggerService, 'initialized', {
+        value: false,
+        writable: true
+      });
+      Object.defineProperty(StructuredLoggerService, 'contextLogLevels', {
+        value: { 'SpecificContext': 'debug' },
+        writable: true
+      });
+
       // Create a new instance that will pick up the modified config due to static reset in global afterEach
       const contextSpecificService = new StructuredLoggerService(mockConfigService as any, mockLogTransportService as any);
       contextSpecificService.debug('Debug message for specific context', 'SpecificContext');
-      expect(mockLogTransportService.sendLog).toHaveBeenCalledWith(expect.objectContaining({ level: 'debug', context: 'SpecificContext' }));
+      expect(mockLogTransportService.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({ 
+          level: 'debug', 
+          context: 'SpecificContext',
+          message: 'Debug message for specific context'
+        })
+      );
     });
 
     it('should NOT log "debug" for "OtherContext" when global is "info"', () => {

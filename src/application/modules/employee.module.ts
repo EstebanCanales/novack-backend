@@ -1,9 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Employee, Supplier, EmployeeCredentials } from '../../../domain/entities'; // Adjusted path
-import { EmployeeController } from '../../../interface/controllers/employee.controller'; // Adjusted path
+import { Employee, Supplier } from '../../domain/entities'; // Adjusted path
+import { EmployeeCredentials } from '../../domain/entities/employee-credentials.entity';
+import { EmployeeController } from '../../interface/controllers/employee.controller'; // Adjusted path
+import { EmployeeService } from '../services/employee.service';
 
 // Use Cases (ensure index file exports all of them)
 import {
@@ -19,8 +19,8 @@ import {
 } from '../use-cases/employee';
 
 // Repositories - Interface & Implementation
-import { IEmployeeRepository, ISupplierRepository } from '../../../domain/repositories'; // ISupplierRepository for type safety if bound here
-import { EmployeeRepository, SupplierRepository } from '../../../infrastructure/repositories'; // SupplierRepository if bound here
+import { IEmployeeRepository, ISupplierRepository } from '../../domain/repositories'; // Ruta corregida
+import { EmployeeRepository, SupplierRepository } from '../../infrastructure/repositories'; // Ruta corregida
 
 // Other necessary modules
 import { TokenModule } from './token.module'; // Retained
@@ -37,11 +37,12 @@ import { SupplierModule } from './supplier.module';
     TypeOrmModule.forFeature([Employee, EmployeeCredentials, Supplier]),
     TokenModule,
     FileStorageModule,
-    SupplierModule, // To provide ISupplierRepository for GetEmployeesBySupplierUseCase
+    forwardRef(() => SupplierModule), // Usando forwardRef para resolver la dependencia circular
   ],
   controllers: [EmployeeController],
   providers: [
-    // EmployeeService is removed
+    // Añadiendo EmployeeService nuevamente
+    EmployeeService,
 
     // All Employee Use Cases
     CreateEmployeeUseCase, // Was already partially there
@@ -63,22 +64,21 @@ import { SupplierModule } from './supplier.module';
 
     // Repository Interface Binding
     {
-      provide: IEmployeeRepository, // Using the actual Symbol/token
+      provide: 'IEmployeeRepository', // Usando string en lugar de símbolo para coincidir con cómo se inyecta en EmployeeService
       useClass: EmployeeRepository,
     },
-    // Note: If IEmployeeRepository was previously bound with string 'IEmployeeRepository',
-    // ensure consistency or update all injections to use the Symbol.
-    // The original used string 'IEmployeeRepository'. Let's stick to that for minimal diff unless Symbol is preferred project-wide.
-    // Reverting to string token for IEmployeeRepository to match original module for now.
-    // {
-    //   provide: 'IEmployeeRepository', // Sticking to original string token for this example
-    //   useClass: EmployeeRepository,
-    // }
+    // Mantenemos también la inyección usando símbolo para los use cases que lo requieran
+    {
+      provide: IEmployeeRepository,
+      useClass: EmployeeRepository,
+    },
   ],
   exports: [
-    // EmployeeService is removed
+    // Exportando EmployeeService para que sea accesible desde otros módulos
+    EmployeeService,
     // Export the repository interface token if other modules need to inject it.
-    IEmployeeRepository, // Exporting the Symbol token for consistency
+    'IEmployeeRepository', // Exportando como string
+    IEmployeeRepository, // Exportando también como símbolo para mantener compatibilidad
   ],
 })
 export class EmployeeModule {}

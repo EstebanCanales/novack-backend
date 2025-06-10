@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { SupplierService } from "../services/supplier.service";
 import { SupplierController } from "../../interface/controllers/supplier.controller";
 import { TypeOrmModule } from "@nestjs/typeorm";
@@ -8,11 +8,13 @@ import { EmployeeModule } from "./employee.module";
 import { FileStorageModule } from './file-storage.module';
 import { ImageProcessingPipe } from '../pipes/image-processing.pipe';
 import { TokenModule } from "./token.module";
+import { ISupplierRepository } from "../../domain/repositories/supplier.repository.interface";
+import { SupplierRepository } from "../../infrastructure/repositories/supplier.repository";
 
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([Supplier, SupplierSubscription]),
-		EmployeeModule,
+		forwardRef(() => EmployeeModule),
 		TokenModule,
 		FileStorageModule,
 	],
@@ -21,7 +23,15 @@ import { TokenModule } from "./token.module";
 		SupplierService,
 		EmailService,
 		ImageProcessingPipe,
+		SupplierRepository,
+		{
+			provide: ISupplierRepository,
+			useClass: SupplierRepository
+		}
 	],
-	exports: [SupplierService]
+	exports: [
+		SupplierService,
+		ISupplierRepository
+	]
 })
 export class SupplierModule {}

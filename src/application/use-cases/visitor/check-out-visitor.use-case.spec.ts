@@ -135,11 +135,11 @@ describe('CheckOutVisitorUseCase', () => {
       expect(cardService.unassignFromVisitor).toHaveBeenCalledWith(cardId);
       expect(emailService.sendVisitorCheckoutEmail).toHaveBeenCalled();
       expect(result.state).toEqual('completado');
-      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Visitor check-out initiated'), undefined, { visitorId });
-      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Appointment updated to "completado"'), undefined, expect.objectContaining({ appointmentId }));
-      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Visitor state updated to "completado"'), undefined, expect.objectContaining({ visitorId }));
-      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Card unassigned'), undefined, expect.objectContaining({ cardId }));
-      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Visitor checkout email dispatch requested'), undefined, expect.objectContaining({ visitorId }));
+      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Visitor check-out initiated'), undefined, undefined, { visitorId });
+      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Appointment updated to "completado"'), undefined, undefined, expect.objectContaining({ appointmentId }));
+      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Visitor state updated to "completado"'), undefined, undefined, expect.objectContaining({ visitorId }));
+      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Card unassigned'), undefined, undefined, expect.objectContaining({ cardId }));
+      expect(mockLoggerService.log).toHaveBeenCalledWith(expect.stringContaining('Visitor checkout email dispatch requested'), undefined, undefined, expect.objectContaining({ visitorId }));
     });
 
     it('should successfully check out a visitor without a card', async () => {
@@ -148,7 +148,7 @@ describe('CheckOutVisitorUseCase', () => {
       await useCase.execute(visitorId);
 
       expect(cardService.unassignFromVisitor).not.toHaveBeenCalled();
-      expect(mockLoggerService.log).not.toHaveBeenCalledWith(expect.stringContaining('Card unassigned'), undefined, expect.anything());
+      expect(mockLoggerService.log).not.toHaveBeenCalledWith(expect.stringContaining('Card unassigned'), undefined, undefined, expect.anything());
       expect(visitorRepo.save).toHaveBeenCalledWith(expect.objectContaining({ state: 'completado' }));
       expect(emailService.sendVisitorCheckoutEmail).toHaveBeenCalled();
     });
@@ -156,38 +156,38 @@ describe('CheckOutVisitorUseCase', () => {
     it('should throw NotFoundException if visitor not found', async () => {
       mockVisitorRepository.findById.mockResolvedValue(null);
       await expect(useCase.execute(visitorId)).rejects.toThrow(NotFoundException);
-      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Visitor not found for check-out'), undefined, { visitorId });
+      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Visitor not found for check-out'), undefined, undefined, { visitorId });
     });
 
     it('should throw BadRequestException if visitor already checked out', async () => {
       mockVisitorRepository.findById.mockResolvedValue({ ...mockVisitorWithCard, state: 'completado' } as Visitor);
       await expect(useCase.execute(visitorId)).rejects.toThrow(BadRequestException);
-      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Visitor already checked out'), undefined, expect.objectContaining({ visitorId }));
+      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Visitor already checked out'), undefined, undefined, expect.objectContaining({ visitorId }));
     });
 
     it('should throw BadRequestException if visitor has no appointments', async () => {
       mockVisitorRepository.findById.mockResolvedValue({ ...mockVisitorWithCard, appointments: [] } as Visitor);
       await expect(useCase.execute(visitorId)).rejects.toThrow(BadRequestException);
-      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('No appointments found for visitor during check-out'), undefined, { visitorId });
+      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('No appointments found for visitor during check-out'), undefined, undefined, { visitorId });
     });
 
     it('should throw NotFoundException if specific appointment not found', async () => {
       mockVisitorRepository.findById.mockResolvedValue(mockVisitorWithCard); // Visitor has an appointment ID listed
       mockAppointmentRepository.findById.mockResolvedValue(null); // But it's not found
       await expect(useCase.execute(visitorId)).rejects.toThrow(NotFoundException);
-      expect(mockLoggerService.error).toHaveBeenCalledWith(expect.stringContaining('Associated appointment not found during checkout'), undefined, expect.objectContaining({ visitorId, appointmentId }));
+      expect(mockLoggerService.error).toHaveBeenCalledWith(expect.stringContaining('Associated appointment not found during checkout'), undefined, undefined, expect.objectContaining({ visitorId, appointmentId }));
     });
 
     it('should throw BadRequestException if appointment not checked in', async () => {
       mockAppointmentRepository.findById.mockResolvedValue({ ...mockCheckedInAppointment, check_in_time: null } as any);
       await expect(useCase.execute(visitorId)).rejects.toThrow(BadRequestException);
-      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Visitor has not checked in for this appointment'), undefined, expect.objectContaining({ visitorId, appointmentId }));
+      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Visitor has not checked in for this appointment'), undefined, undefined, expect.objectContaining({ visitorId, appointmentId }));
     });
 
     it('should log warning if unassigning card fails but still complete checkout', async () => {
       mockCardService.unassignFromVisitor.mockRejectedValue(new Error('Unassign failed'));
       await useCase.execute(visitorId); // Should not throw
-      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Failed to unassign card during check-out'), undefined, expect.objectContaining({ visitorId, cardId, error: 'Unassign failed' }));
+      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Failed to unassign card during check-out'), undefined, undefined, expect.objectContaining({ visitorId, cardId, error: 'Unassign failed' }));
       expect(visitorRepo.save).toHaveBeenCalledWith(expect.objectContaining({ state: 'completado' }));
       expect(emailService.sendVisitorCheckoutEmail).toHaveBeenCalled();
     });
@@ -195,7 +195,7 @@ describe('CheckOutVisitorUseCase', () => {
     it('should log warning if sending checkout email fails but still complete checkout', async () => {
       mockEmailService.sendVisitorCheckoutEmail.mockRejectedValue(new Error('Email send failed'));
       await useCase.execute(visitorId); // Should not throw
-      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Failed to send visitor checkout email for'), undefined, expect.objectContaining({ visitorId, error: 'Email send failed' }));
+      expect(mockLoggerService.warn).toHaveBeenCalledWith(expect.stringContaining('Failed to send visitor checkout email for'), undefined, undefined, expect.objectContaining({ visitorId, error: 'Email send failed' }));
       expect(visitorRepo.save).toHaveBeenCalledWith(expect.objectContaining({ state: 'completado' }));
     });
   });

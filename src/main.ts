@@ -15,10 +15,10 @@ async function bootstrap() {
     bufferLogs: true, // Buffer logs until a logger is attached
   });
 
-  // Use the app's StructuredLoggerService for consistency, or resolve if needed for main bootstrap logs.
+  // Use the app's StructuredLoggerService for consistency, using resolve() for TRANSIENT scoped providers
   // For the GlobalExceptionFilter, we need an instance of StructuredLoggerService.
   // Since LoggingModule is Global, StructuredLoggerService should be available.
-  const structuredLoggerService = app.get(StructuredLoggerService);
+  const structuredLoggerService = await app.resolve(StructuredLoggerService);
 
   // app.useLogger(Logger); // Using NestJS's default Logger token, which should be our StructuredLoggerService
   // It's better to pass the specific instance if we have it, especially for app-level logging.

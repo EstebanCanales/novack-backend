@@ -28,7 +28,7 @@ export class SmsService {
         this.isInitialized = true;
         this.logger.log('Twilio client initialized successfully.');
       } catch (error) {
-        this.logger.error('Failed to initialize Twilio client', { error: error.message });
+        this.logger.error('Failed to initialize Twilio client', undefined, JSON.stringify({ error: error.message }));
         // isInitialized remains false
       }
     }
@@ -54,15 +54,15 @@ export class SmsService {
         from: this.twilioFromPhoneNumber,
         body: messageBody,
       });
-      this.logger.log('OTP SMS sent successfully', { to: phoneNumber });
+      this.logger.log('OTP SMS sent successfully', undefined, JSON.stringify({ to: phoneNumber }));
     } catch (error) {
-      this.logger.error('Failed to send OTP SMS via Twilio', {
+      this.logger.error('Failed to send OTP SMS via Twilio', undefined, JSON.stringify({
         to: phoneNumber,
         // Avoid logging full error object if it contains sensitive Twilio details in some cases
         // Log specific parts like error.message, error.code if available
         errorMessage: error.message,
         errorCode: error.code,
-      });
+      }));
       throw new InternalServerErrorException('Failed to send OTP SMS.');
     }
   }

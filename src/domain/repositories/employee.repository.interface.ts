@@ -22,6 +22,27 @@ export interface IEmployeeRepository {
   findByResetToken(token: string): Promise<Employee | null>;
 
   /**
+   * Busca un empleado por email incluyendo sus credenciales y número de teléfono
+   * @param email El email del empleado
+   * @returns El empleado con sus credenciales o null si no se encuentra
+   */
+  findByEmailWithCredentialsAndPhone(email: string): Promise<Employee | null>;
+
+  /**
+   * Busca un empleado por ID incluyendo sus credenciales y número de teléfono
+   * @param id El ID del empleado
+   * @returns El empleado con sus credenciales o null si no se encuentra
+   */
+  findByIdWithCredentialsAndPhone(id: string): Promise<Employee | null>;
+
+  /**
+   * Busca un empleado por ID incluyendo sus credenciales
+   * @param id El ID del empleado
+   * @returns El empleado con sus credenciales o null si no se encuentra
+   */
+  findByIdWithCredentials(id: string): Promise<Employee | null>;
+
+  /**
    * Saves an employee entity. If the entity has an ID and exists in the database, it's updated.
    * Otherwise, it's inserted. This method should handle cascading saves for related entities
    * like EmployeeCredentials if they are part of the Employee aggregate and configured with cascades.

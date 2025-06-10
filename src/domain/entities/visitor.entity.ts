@@ -48,6 +48,9 @@ export class Visitor {
   @ManyToOne(() => Supplier, (supplier) => supplier.visitors)
   supplier: Supplier;
 
+  @Column({ nullable: true })
+  supplier_id: string;
+
   @OneToOne(() => Card, (card) => card.visitor)
   card: Card;
 

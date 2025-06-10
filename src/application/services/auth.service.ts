@@ -39,7 +39,7 @@ export class AuthService {
     const employee = await this.employeeRepository.findByEmailWithCredentialsAndPhone(email);
     
     if (!employee || !employee.credentials) {
-      this.logger.warn('Login failed: Invalid credentials - User not found or no credentials', { email: email });
+      this.logger.warn('Login failed: Invalid credentials - User not found or no credentials', undefined, JSON.stringify({ email: email }));
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
@@ -50,27 +50,27 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
-      this.logger.warn('Login failed: Invalid credentials - Password mismatch', { email: email });
+      this.logger.warn('Login failed: Invalid credentials - Password mismatch', undefined, JSON.stringify({ email: email }));
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
     // Verificar si el correo está verificado
     if (!employee.credentials.is_email_verified) {
-      this.logger.warn('Login failed: Email not verified', { email: email });
+      this.logger.warn('Login failed: Email not verified', undefined, JSON.stringify({ email: email }));
       throw new UnauthorizedException('El correo electrónico no ha sido verificado');
     }
 
     // SMS 2FA Check
     if (employee.credentials.is_sms_2fa_enabled && employee.credentials.phone_number_verified) {
       if (!employee.phone) {
-        this.logger.error('SMS 2FA enabled but no phone number for user', { userId: employee.id });
+        this.logger.error('SMS 2FA enabled but no phone number for user', undefined, JSON.stringify({ userId: employee.id }));
         // This is an internal configuration error, not a user error.
         throw new InternalServerErrorException('SMS 2FA configuration error for user.');
       }
       const otp = this.generateSixDigitCode();
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5-minute expiry
 
-      this.logger.log('Attempting to send SMS OTP for login', { userId: employee.id, phoneNumber: employee.phone });
+      this.logger.log('Attempting to send SMS OTP for login', undefined, JSON.stringify({ userId: employee.id, phoneNumber: employee.phone }));
       await this.employeeRepository.updateCredentials(employee.id, {
         sms_otp_code: otp,
         sms_otp_code_expires_at: expiresAt,
@@ -78,14 +78,14 @@ export class AuthService {
 
       try {
         await this.smsService.sendOtp(employee.phone, otp);
-        this.logger.log('SMS OTP sent for login process step', { userId: employee.id }); // Clarified log message
+        this.logger.log('SMS OTP sent for login process step', undefined, JSON.stringify({ userId: employee.id })); // Clarified log message
         return {
           message: 'SMS OTP verification required.',
           smsOtpRequired: true,
           userId: employee.id
         };
       } catch (smsError) {
-        this.logger.error('Failed to send login OTP SMS via SmsService during login attempt', { userId: employee.id, error: smsError.message });
+        this.logger.error('Failed to send login OTP SMS via SmsService during login attempt', undefined, JSON.stringify({ userId: employee.id, error: smsError.message }));
         // Depending on policy, could allow login without OTP if SMS fails, or deny.
         // For now, denying by throwing an error.
         throw new InternalServerErrorException('Failed to send login OTP. Please try again.');
@@ -99,11 +99,11 @@ export class AuthService {
 
 
     // If no SMS 2FA (or other 2FA like TOTP not triggered), proceed with login
-    this.logger.log('Login successful (no SMS OTP required or passed), generating tokens...', {
+    this.logger.log('Login successful (no SMS OTP required or passed), generating tokens...', undefined, JSON.stringify({
       userId: employee.id,
       email: employee.email,
       supplierId: employee.supplier_id,
-    });
+    }));
 
     await this.employeeRepository.updateCredentials(employee.id, {
       last_login: new Date(),
@@ -119,24 +119,24 @@ export class AuthService {
   }
 
   async verifySmsOtpAndLogin(userId: string, otp: string, req: Request): Promise<any> {
-    this.logger.log('Attempting to verify SMS OTP for login completion', { userId });
+    this.logger.log('Attempting to verify SMS OTP for login completion', undefined, JSON.stringify({ userId }));
     // Ensure findByIdWithCredentialsAndPhone fetches necessary fields
     const employee = await this.employeeRepository.findByIdWithCredentialsAndPhone(userId);
 
     if (!employee || !employee.credentials) {
-      this.logger.warn('SMS OTP login verification failed: Employee or credentials not found', { userId, reason: 'Employee or credentials not found' });
+      this.logger.warn('SMS OTP login verification failed: Employee or credentials not found', undefined, JSON.stringify({ userId, reason: 'Employee or credentials not found' }));
       throw new UnauthorizedException('Usuario o credenciales no encontradas.');
     }
 
     const { sms_otp_code: storedOtp, sms_otp_code_expires_at: expiry } = employee.credentials;
 
     if (!storedOtp || !expiry) {
-      this.logger.warn('SMS OTP login verification failed: No OTP pending', { userId, reason: 'No OTP pending or already verified' });
+      this.logger.warn('SMS OTP login verification failed: No OTP pending', undefined, JSON.stringify({ userId, reason: 'No OTP pending or already verified' }));
       throw new UnauthorizedException('No hay código OTP pendiente para este usuario.');
     }
 
     if (expiry < new Date()) {
-      this.logger.warn('SMS OTP login verification failed: OTP has expired', { userId, reason: 'OTP expired' });
+      this.logger.warn('SMS OTP login verification failed: OTP has expired', undefined, JSON.stringify({ userId, reason: 'OTP expired' }));
       await this.employeeRepository.updateCredentials(userId, {
         sms_otp_code: null,
         sms_otp_code_expires_at: null,
@@ -145,7 +145,7 @@ export class AuthService {
     }
 
     if (storedOtp !== otp) {
-      this.logger.warn('SMS OTP login verification failed: Invalid OTP', { userId, reason: 'Invalid OTP' });
+      this.logger.warn('SMS OTP login verification failed: Invalid OTP', undefined, JSON.stringify({ userId, reason: 'Invalid OTP' }));
       // Consider attempt counting / locking mechanism here for security
       throw new UnauthorizedException('Código OTP inválido.');
     }
@@ -158,7 +158,7 @@ export class AuthService {
     });
 
     const tokens = await this.tokenService.generateTokens(employee, req);
-    this.logger.log('SMS OTP verified successfully, login completed', { userId }); // Log after all operations succeed
+    this.logger.log('SMS OTP verified successfully, login completed', undefined, JSON.stringify({ userId })); // Log after all operations succeed
 
     return {
       ...tokens,
@@ -172,16 +172,16 @@ export class AuthService {
     if (!refreshTokenValue) {
       throw new UnauthorizedException('Refresh token is required');
     }
-    this.logger.log('Attempting to refresh token', {
+    this.logger.log('Attempting to refresh token', undefined, JSON.stringify({
       // Avoid logging full token for security
       refreshTokenPrefix: refreshTokenValue.substring(0, 10) + '...',
-    });
+    }));
     try {
       const newTokens = await this.tokenService.refreshAccessToken(refreshTokenValue, req);
       this.logger.log('Token refreshed successfully');
       return newTokens;
     } catch (error) {
-      this.logger.warn('Token refresh failed', { error: error.message });
+      this.logger.warn('Token refresh failed', undefined, JSON.stringify({ error: error.message }));
       throw new UnauthorizedException(error.message || 'Invalid or expired refresh token');
     }
   }
@@ -192,9 +192,9 @@ export class AuthService {
       this.logger.warn('Logout attempt without refresh token.');
       return { message: 'No refresh token provided to invalidate.' };
     }
-    this.logger.log('Attempting to logout (invalidate refresh token)', {
+    this.logger.log('Attempting to logout (invalidate refresh token)', undefined, JSON.stringify({
       refreshTokenPrefix: refreshTokenValue.substring(0, 10) + '...',
-    });
+    }));
     const revoked = await this.tokenService.revokeToken(refreshTokenValue);
     if (revoked) {
       this.logger.log('Refresh token revoked successfully.');
