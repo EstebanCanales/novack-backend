@@ -69,8 +69,8 @@ export class UpdateVisitorAndAppointmentUseCase {
         this.logger.warn('Supplier not found during visitor update', undefined, { supplierId: updateVisitorDto.supplier_id, visitorId: id });
         throw new BadRequestException('El proveedor especificado no existe');
       }
-      visitor.supplier = supplier;
-      visitor.supplier_id = supplier.id; // Ensure this is set if your entity uses it
+      visitor.supplier = supplier; // Assigning the supplier object; TypeORM should handle the FK
+      // visitor.supplier_id = supplier.id; // Removed direct assignment, assuming TypeORM handles it via the relation
       appointmentToUpdate.supplier = supplier;
       // appointmentToUpdate.supplier_id = supplier.id; // if direct id field exists on appointment
     }

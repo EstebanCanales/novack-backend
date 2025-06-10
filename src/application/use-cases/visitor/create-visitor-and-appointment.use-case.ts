@@ -60,7 +60,7 @@ export class CreateVisitorAndAppointmentUseCase {
       location: createVisitorDto.location,
       state: 'pendiente', // Initial state
       supplier: supplier,
-      supplier_id: supplier.id, // Explicitly set supplier_id if not automatically handled by TypeORM from 'supplier' entity
+      // supplier_id: supplier.id, // TypeORM should handle this via the 'supplier' object relation
       // profile_image_url can be set if part of DTO and entity
     };
     const visitorInstance = this.visitorRepository.create(visitorEntityData);

@@ -254,9 +254,16 @@ describe('StructuredLoggerService', () => {
       expect(logCall.level).toBe('error');
       expect(logCall.message).toBe('Test error');
       expect(logCall.context).toBe('ErrorContext');
+      // Verify stack_trace is a top-level property
+      expect(logCall.stack_trace).toEqual(error.stack);
+      // Verify meta contains only the customMeta part
       expect(logCall.meta).toEqual(expect.arrayContaining([
-        { customMeta: "value" },
-        { trace: error.stack }
+        { customMeta: "value" }
+        // { trace: error.stack } // Removed from meta
+      ]));
+      // Ensure meta does not contain the trace if it's top-level
+      expect(logCall.meta).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ trace: error.stack })
       ]));
     });
 

@@ -53,14 +53,27 @@ describe('CardService with Redis Integration', () => {
   beforeEach(async () => {
     jest.clearAllMocks(); // Clear all mocks
 
+    // Define a mock for ConfigService directly, as RedisDatabaseService depends on it.
+    const mockConfigServiceInstance = {
+      get: jest.fn((key: string, defaultValue?: any) => {
+        // Provide specific mock values needed by RedisDatabaseService
+        if (key === 'REDIS_HOST') return 'localhost';
+        if (key === 'REDIS_PORT') return 6379;
+        if (key === 'REDIS_PASSWORD') return undefined; // Or mock value if used
+        if (key === 'REDIS_ENCRYPTION_KEY') return 'test_encryption_key';
+        // Add other config values that might be used by RedisDatabaseService or CardService
+        return defaultValue;
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       imports: [
-        LoggingModule, // Import LoggingModule to provide StructuredLoggerService
-        ConfigModule.forRoot({ isGlobal: true }), // Ensure ConfigService is available
+        LoggingModule, // LoggingModule should provide StructuredLoggerService.
+                       // It should import ConfigModule if StructuredLoggerService needs ConfigService.
       ],
       providers: [
         CardService,
-        RedisDatabaseService, // Provide the real RedisDatabaseService
+        RedisDatabaseService,
         {
           provide: getRepositoryToken(Card),
           useValue: mockCardRepository,
@@ -71,17 +84,20 @@ describe('CardService with Redis Integration', () => {
         },
         {
           provide: getRepositoryToken(Supplier),
-          useValue: {}, // Keep mocks for unrelated repositories
+          useValue: {},
         },
         {
           provide: getRepositoryToken(Visitor),
-          useValue: {}, // Keep mocks for unrelated repositories
+          useValue: {},
         },
         {
-          provide: 'REDIS_CLIENT_TYPE', // Provide the mock Redis client for RedisDatabaseService
+          provide: 'REDIS_CLIENT_TYPE',
           useValue: mockRedisClient,
         },
-        // ConfigService is provided by ConfigModule.forRoot()
+        { // Provide ConfigService directly
+          provide: ConfigService,
+          useValue: mockConfigServiceInstance,
+        }
         // StructuredLoggerService is provided by LoggingModule
       ],
     }).compile();

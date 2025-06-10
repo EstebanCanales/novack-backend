@@ -1,6 +1,7 @@
 import { Controller, Post, Body, UnauthorizedException, Req, HttpStatus, HttpCode } from '@nestjs/common'; // Res removed as not used
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiProperty } from '@nestjs/swagger'; // ApiProperty import for inline DTOs if needed, but we'll use external
-import { AuthenticateEmployeeUseCase, AuthenticateEmployeeDto, AuthenticationResult } from '../../application/use-cases/auth/authenticate-employee.use-case';
+// AuthenticationResult type import removed, will use AuthenticationResultDto
+import { AuthenticateEmployeeUseCase, AuthenticateEmployeeDto } from '../../application/use-cases/auth/authenticate-employee.use-case';
 import { Public } from '../../application/decorators/public.decorator';
 import { Request } from 'express'; // Response removed as not used
 import { AuthService } from '../../application/services/auth.service';
@@ -8,11 +9,12 @@ import { AuthService } from '../../application/services/auth.service';
 import { RefreshTokenDto } from '../../application/dtos/auth/refresh-token.dto';
 import { LogoutDto } from '../../application/dtos/auth/logout.dto';
 import { LoginSmsVerifyDto } from '../../application/dtos/auth/login.dto'; // Import new DTO
+import { AuthenticationResultDto } from '../../application/dtos/auth/authentication-result.dto'; // Import DTO
 
 // Define a more complex response type for login that can include OTP requirement
 const LoginResponseSchema = {
   oneOf: [
-    { $ref: '#/components/schemas/AuthenticationResult' }, // Assuming AuthenticationResult is registered
+    { $ref: `#/components/schemas/${AuthenticationResultDto.name}` }, // Use DTO name for ref
     {
       type: 'object',
       properties: {
@@ -58,7 +60,7 @@ export class AuthController {
   @Public()
   @ApiOperation({ summary: 'Refrescar access token usando un refresh token' })
   @ApiBody({ type: RefreshTokenDto }) // Use the imported DTO
-  @ApiResponse({ status: 200, description: 'Token refrescado exitosamente', type: AuthenticationResult })
+  @ApiResponse({ status: 200, description: 'Token refrescado exitosamente', type: AuthenticationResultDto })
   @ApiResponse({ status: 401, description: 'Refresh token inválido o expirado' })
   async refreshToken(@Body() refreshTokenDto: RefreshTokenDto, @Req() req: Request) {
     // Validation for refresh_token presence is now handled by ValidationPipe if DTO uses class-validator
@@ -87,10 +89,11 @@ export class AuthController {
   @ApiOperation({ summary: 'Verificar OTP por SMS y completar el inicio de sesión' })
   @ApiBody({ type: LoginSmsVerifyDto })
   // The response here should be the AuthenticationResult upon successful OTP verification
-  @ApiResponse({ status: 200, description: 'Inicio de sesión exitoso después de la verificación del OTP por SMS.', type: AuthenticationResult })
+  @ApiResponse({ status: 200, description: 'Inicio de sesión exitoso después de la verificación del OTP por SMS.', type: AuthenticationResultDto })
   @ApiResponse({ status: 401, description: 'No autorizado (ej. OTP inválido, OTP expirado, usuario no encontrado)' })
-  async loginSmsVerify(@Body() loginSmsVerifyDto: LoginSmsVerifyDto, @Req() req: Request): Promise<AuthenticationResult> {
+  async loginSmsVerify(@Body() loginSmsVerifyDto: LoginSmsVerifyDto, @Req() req: Request): Promise<AuthenticationResultDto> {
     // Pass the original request object if your TokenService needs it for generating tokens
+    // The return type of authService.verifySmsOtpAndLogin should also align with AuthenticationResultDto
     return this.authService.verifySmsOtpAndLogin(loginSmsVerifyDto.userId, loginSmsVerifyDto.otp, req);
   }
 }

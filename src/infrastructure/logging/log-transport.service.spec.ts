@@ -190,10 +190,26 @@ describe('LogTransportService', () => {
         });
         const fileService = new LogTransportService(mockConfigService);
         fileService.onModuleInit(); // To setup writestream
-        fileService.sendLog(logData);
-        // Need to get the mock writestream instance that was created for this service instance
+
+        // Use a fixed timestamp for predictable output if needed, or rely on expect.any(String) for dynamic parts
+        const fixedTimestamp = new Date().toISOString();
+        const testLogData = { message: 'test log', level: 'info', timestamp: fixedTimestamp };
+        fileService.sendLog(testLogData);
+
         const currentMockWriteStream = (fs.createWriteStream as jest.Mock).mock.results.find(r => r.type === 'return')?.value;
-        expect(currentMockWriteStream.write).toHaveBeenCalledWith(expect.stringContaining(logData.message) + '\n');
+
+        // Construct the core part of the expected log object
+        const expectedLogPayload = {
+            message: testLogData.message,
+            level: testLogData.level,
+            timestamp: testLogData.timestamp,
+            application: 'test-app', // As per mockConfigService
+            environment: 'test',   // As per mockConfigService
+        };
+
+        expect(currentMockWriteStream.write).toHaveBeenCalledWith(
+            JSON.stringify(expect.objectContaining(expectedLogPayload)) + '\n'
+        );
       });
 
     // More tests for Logstash connection, queuing, errors, retries, etc.
