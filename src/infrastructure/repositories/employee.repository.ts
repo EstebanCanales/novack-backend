@@ -41,6 +41,27 @@ export class EmployeeRepository implements IEmployeeRepository {
     });
   }
 
+  async findByEmailWithCredentialsAndPhone(email: string): Promise<Employee | null> {
+    return this.employeeEntityRepository.findOne({
+      where: { email },
+      relations: ['credentials']
+    });
+  }
+
+  async findByIdWithCredentialsAndPhone(id: string): Promise<Employee | null> {
+    return this.employeeEntityRepository.findOne({
+      where: { id },
+      relations: ['credentials']
+    });
+  }
+
+  async findByIdWithCredentials(id: string): Promise<Employee | null> {
+    return this.employeeEntityRepository.findOne({
+      where: { id },
+      relations: ['credentials']
+    });
+  }
+
   async create(employeeData: Partial<Employee>): Promise<Employee> {
     const newEmployee = this.employeeEntityRepository.create(employeeData);
     
@@ -102,4 +123,14 @@ export class EmployeeRepository implements IEmployeeRepository {
       relations: ['credentials']
     });
   }
-} 
+
+  async save(employee: Employee): Promise<Employee> {
+    // TypeORM's save method handles both insert and update.
+    // If 'employee' has an 'id' and it exists, it's an update.
+    // Otherwise, it's an insert.
+    // It will also cascade save related entities like 'credentials' if the Employee entity instance
+    // has the 'credentials' property set and the relation is configured for cascade insert/update.
+    // The Employee entity's OneToOne relation to EmployeeCredentials should have cascade: true.
+    return this.employeeEntityRepository.save(employee);
+  }
+}

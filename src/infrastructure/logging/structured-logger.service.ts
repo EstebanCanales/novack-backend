@@ -15,17 +15,28 @@ export interface LogContext {
 export class StructuredLoggerService implements LoggerService {
   private static contextStorage = new AsyncLocalStorage<LogContext>();
   private context?: string;
-  private static logLevel: 'debug' | 'info' | 'warn' | 'error' = 'info';
+  private static defaultLogLevel: 'debug' | 'info' | 'warn' | 'error' | 'verbose' = 'info';
+  private static contextLogLevels: Record<string, 'debug' | 'info' | 'warn' | 'error' | 'verbose'> = {};
   private static logTransport: LogTransportService;
+  private static initialized = false;
 
   constructor(
-    private configService?: ConfigService,
-    logTransport?: LogTransportService
+    configService?: ConfigService, // Made optional as it's primarily for static init
+    logTransport?: LogTransportService,
   ) {
-    if (this.configService) {
-      StructuredLoggerService.logLevel = this.configService.get<'debug' | 'info' | 'warn' | 'error'>('LOG_LEVEL', 'info');
+    if (!StructuredLoggerService.initialized && configService) {
+      StructuredLoggerService.defaultLogLevel = configService.get<'debug' | 'info' | 'warn' | 'error' | 'verbose'>(
+        'logging.level',
+        'info',
+      );
+      StructuredLoggerService.contextLogLevels = configService.get<Record<string, 'debug' | 'info' | 'warn' | 'error' | 'verbose'>>(
+        'logging.contextLogLevels',
+        {},
+      );
+      StructuredLoggerService.initialized = true;
     }
-    if (logTransport) {
+    // Allow logTransport to be set by any instance if not already set
+    if (logTransport && !StructuredLoggerService.logTransport) {
       StructuredLoggerService.logTransport = logTransport;
     }
   }
@@ -51,65 +62,100 @@ export class StructuredLoggerService implements LoggerService {
     this.context = context;
   }
 
+  // Helper to determine if a message should be logged based on level and context
+  private shouldLog(level: 'debug' | 'info' | 'warn' | 'error' | 'verbose', context?: string): boolean {
+    const contextName = context || this.context || 'Global';
+    const contextLevel = StructuredLoggerService.contextLogLevels[contextName] || StructuredLoggerService.defaultLogLevel;
+
+    const levelPriority = { verbose: 0, debug: 1, info: 2, warn: 3, error: 4 };
+
+    return levelPriority[level] >= levelPriority[contextLevel];
+  }
+
   private formatLog(level: string, message: any, context?: string, ...meta: any[]): any {
     const currentContext = StructuredLoggerService.getCurrentContext();
     const timestamp = new Date().toISOString();
     const contextName = context || this.context || 'Global';
     const correlationId = currentContext.correlationId || 'no-correlation-id';
+    let stackTrace: string | undefined;
+    const remainingMeta = [];
 
-    // Estructurar el log en formato JSON para ELK/Grafana
-    return {
+    if (level === 'error') {
+      for (const item of meta) {
+        if (item && typeof item === 'object' && item.hasOwnProperty('stack_trace')) {
+          stackTrace = item.stack_trace;
+        } else {
+          remainingMeta.push(item);
+        }
+      }
+    } else {
+      remainingMeta.push(...meta);
+    }
+
+    const logEntry: any = {
       timestamp,
       level,
       message: typeof message === 'object' ? JSON.stringify(message) : message,
       context: contextName,
       correlationId,
-      ...currentContext,
-      meta: meta.length ? meta : undefined,
+      ...currentContext, // Includes userId, requestPath etc. from async local storage
     };
+
+    if (stackTrace) {
+      logEntry.stack_trace = stackTrace;
+    }
+
+    if (remainingMeta.length > 0) {
+      logEntry.meta = remainingMeta;
+    }
+
+    return logEntry;
   }
 
-  private sendLog(level: string, formattedLog: any): void {
+  private sendLog(formattedLog: any): void {
     if (StructuredLoggerService.logTransport) {
       StructuredLoggerService.logTransport.sendLog(formattedLog);
     } else {
       // Fallback a console si no hay transporte configurado
+      // Ensure this fallback is also structured if possible, or at least consistent.
       console.log(JSON.stringify(formattedLog));
     }
   }
 
   log(message: any, context?: string, ...meta: any[]): void {
-    if (['debug', 'info', 'warn', 'error'].includes(StructuredLoggerService.logLevel)) {
+    if (this.shouldLog('info', context)) {
       const formattedLog = this.formatLog('info', message, context, ...meta);
-      this.sendLog('info', formattedLog);
+      this.sendLog(formattedLog);
     }
   }
 
   debug(message: any, context?: string, ...meta: any[]): void {
-    if (['debug'].includes(StructuredLoggerService.logLevel)) {
+    if (this.shouldLog('debug', context)) {
       const formattedLog = this.formatLog('debug', message, context, ...meta);
-      this.sendLog('debug', formattedLog);
+      this.sendLog(formattedLog);
     }
   }
 
   warn(message: any, context?: string, ...meta: any[]): void {
-    if (['debug', 'info', 'warn', 'error'].includes(StructuredLoggerService.logLevel)) {
+    if (this.shouldLog('warn', context)) {
       const formattedLog = this.formatLog('warn', message, context, ...meta);
-      this.sendLog('warn', formattedLog);
+      this.sendLog(formattedLog);
     }
   }
 
   error(message: any, context?: string, trace?: string, ...meta: any[]): void {
-    if (['debug', 'info', 'warn', 'error'].includes(StructuredLoggerService.logLevel)) {
-      const formattedLog = this.formatLog('error', message, context, ...[...meta, { trace }]);
-      this.sendLog('error', formattedLog);
+    if (this.shouldLog('error', context)) {
+      // Pass trace explicitly in the meta array for formatLog to identify
+      const errorMeta = trace ? [...meta, { stack_trace: trace }] : [...meta];
+      const formattedLog = this.formatLog('error', message, context, ...errorMeta);
+      this.sendLog(formattedLog);
     }
   }
 
   verbose(message: any, context?: string, ...meta: any[]): void {
-    if (['debug'].includes(StructuredLoggerService.logLevel)) {
+    if (this.shouldLog('verbose', context)) {
       const formattedLog = this.formatLog('verbose', message, context, ...meta);
-      this.sendLog('verbose', formattedLog);
+      this.sendLog(formattedLog);
     }
   }
-} 
+}

@@ -17,13 +17,18 @@ import {
   Verify2FADto,
   Disable2FADto,
   BackupCodeDto,
+  // Import new DTOs for SMS 2FA
+  InitiateSmsVerificationDto,
+  VerifySmsOtpDto,
 } from '../../application/dtos/employee/two-factor-auth.dto';
 
-@ApiTags('2fa')
+@ApiTags('Autenticación de Dos Factores (2FA)') // Updated Tag for clarity
 @Controller('2fa')
 @UseGuards(AuthGuard)
 export class TwoFactorAuthController {
   constructor(private readonly twoFactorAuthService: TwoFactorAuthService) {}
+
+  // --- TOTP Endpoints (existing) ---
 
   @Post('generate')
   @HttpCode(HttpStatus.OK)
@@ -138,6 +143,52 @@ export class TwoFactorAuthController {
     );
     
     return { isValid };
+  }
+
+  // --- SMS 2FA Endpoints (new) ---
+
+  @Post('sms/initiate-verification')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Iniciar verificación de teléfono por SMS para 2FA' })
+  @ApiResponse({ status: 204, description: 'SMS OTP enviado exitosamente al número de teléfono proporcionado.' })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta (ej. número de teléfono inválido, empleado no encontrado)' })
+  @ApiResponse({ status: 500, description: 'Error interno al enviar SMS (ej. fallo del proveedor de SMS)' })
+  async initiateSmsVerification(@Req() req, @Body() dto: InitiateSmsVerificationDto): Promise<void> {
+    const employeeId = req.user.id; // Assumes AuthGuard adds user to request
+    await this.twoFactorAuthService.initiateSmsVerification(employeeId, dto.phone_number);
+  }
+
+  @Post('sms/verify-phone')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verificar OTP por SMS para confirmar número de teléfono' })
+  @ApiResponse({ status: 200, description: 'Número de teléfono verificado exitosamente.', schema: { properties: { verified: { type: 'boolean' } } } })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta (ej. OTP inválido, OTP expirado)' })
+  async verifySmsOtp(@Req() req, @Body() dto: VerifySmsOtpDto): Promise<{ verified: boolean }> {
+    const employeeId = req.user.id;
+    const result = await this.twoFactorAuthService.verifySmsOtpForPhoneNumber(employeeId, dto.otp);
+    return { verified: result };
+  }
+
+  @Post('sms/enable')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Habilitar 2FA basado en SMS para el usuario autenticado' })
+  @ApiResponse({ status: 200, description: '2FA por SMS habilitado exitosamente.', schema: { properties: { sms2faEnabled: { type: 'boolean' } } } })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta (ej. teléfono no verificado)' })
+  async enableSmsTwoFactor(@Req() req): Promise<{ sms2faEnabled: boolean }> {
+    const employeeId = req.user.id;
+    const result = await this.twoFactorAuthService.enableSmsTwoFactor(employeeId);
+    return { sms2faEnabled: result };
+  }
+
+  @Post('sms/disable')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Deshabilitar 2FA basado en SMS para el usuario autenticado' })
+  @ApiResponse({ status: 200, description: '2FA por SMS deshabilitado exitosamente.', schema: { properties: { sms2faEnabled: { type: 'boolean' } } } })
+  @ApiResponse({ status: 400, description: 'Solicitud incorrecta (ej. SMS 2FA no está activo)' })
+  async disableSmsTwoFactor(@Req() req): Promise<{ sms2faEnabled: boolean }> {
+    const employeeId = req.user.id;
+    await this.twoFactorAuthService.disableSmsTwoFactor(employeeId);
+    return { sms2faEnabled: false }; // Reflecting the new state
   }
 }
 

@@ -10,6 +10,7 @@ import { Employee } from './employee.entity';
 import { Visitor } from './visitor.entity';
 import { Card } from './card.entity';
 import { SupplierSubscription } from './supplier-subscription.entity';
+import { Appointment } from './appointment.entity'; // Import Appointment
 
 @Entity({ name: 'suppliers' })
 export class Supplier {
@@ -58,6 +59,9 @@ export class Supplier {
 
   @OneToMany(() => Card, (card) => card.supplier)
   cards: Card[];
+
+  @OneToMany(() => Appointment, appointment => appointment.supplier)
+  appointments: Appointment[];
 
   // Relación con SupplierSubscription - sin decorador para evitar referencias circulares
   subscription?: SupplierSubscription;

@@ -8,7 +8,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ChatMessage, ChatRoom, ChatRoomType } from '../../domain/entities';
 import { IChatRoomRepository } from '../../domain/repositories/chat-room.repository.interface';
-import { ChatDomainService } from '../../domain/services/chat.domain.service';
+import { ChatDomainService } from './chat.domain.service';
 import { CreateRoomDto } from '../dtos/chat/create-room.dto';
 import { CreateMessageDto } from '../dtos/chat/create-message.dto';
 

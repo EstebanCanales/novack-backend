@@ -10,6 +10,8 @@ import { JwtStrategy } from '../strategies/jwt.strategy';
 import { AuthenticateEmployeeUseCase } from '../use-cases/auth/authenticate-employee.use-case';
 import { EmployeeRepository } from '../../infrastructure/repositories/employee.repository';
 import { TokenModule } from './token.module';
+import { AuthService } from '../services/auth.service';
+import { SmsService } from '../services/sms.service';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { TokenModule } from './token.module';
   ],
   controllers: [AuthController],
   providers: [
+    AuthService,
+    SmsService,
     JwtStrategy,
     AuthenticateEmployeeUseCase,
     EmployeeRepository,
@@ -34,7 +38,7 @@ import { TokenModule } from './token.module';
       useClass: EmployeeRepository
     }
   ],
-  exports: [JwtStrategy, JwtModule]
+  exports: [JwtStrategy, JwtModule, AuthService]
 })
 export class AuthModule {}
 
