@@ -5,6 +5,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { I18nModule, AcceptLanguageResolver } from 'nestjs-i18n';
+import * as path from 'path';
 // import { MailerModule } from '@nestjs-modules/mailer';
 import { JwtModule } from '@nestjs/jwt';
 import { PostgresqlDatabaseModule } from './infrastructure/database/postgres/postgresql.database.module';
@@ -130,6 +132,17 @@ import { TokenModule } from './application/modules/token.module';
     }),
     LoggingModule,
     LogstashModule, // Nuevo módulo para gestionar conexión con Logstash
+    // Internationalization module setup
+    I18nModule.forRoot({
+      fallbackLanguage: 'en',
+      loaderOptions: {
+        path: path.join(__dirname, '/i18n/{{lng}}/common.json'),
+        watch: true,
+      },
+      resolvers: [
+        { use: AcceptLanguageResolver, options: {} },
+      ],
+    }),
   ],
   controllers: [RedisTestController],
   providers: [
