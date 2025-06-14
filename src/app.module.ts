@@ -32,6 +32,7 @@ import { RedisTestController } from './interface/controllers/redis-test.controll
 import { LoggingModule } from './infrastructure/logging/logging.module';
 import { LogstashModule } from './infrastructure/services/logstash.module';
 import { HealthModule } from './application/modules/health.module';
+import { StripeModule } from './application/modules/stripe/stripe.module';
 import { TokenModule } from './application/modules/token.module';
 
 /**
@@ -130,6 +131,7 @@ import { TokenModule } from './application/modules/token.module';
     }),
     LoggingModule,
     LogstashModule, // Nuevo módulo para gestionar conexión con Logstash
+    StripeModule, // Stripe module for payment processing
   ],
   controllers: [RedisTestController],
   providers: [

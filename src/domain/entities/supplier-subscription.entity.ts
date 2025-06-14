@@ -38,6 +38,21 @@ export class SupplierSubscription {
   @Column({ type: 'jsonb', nullable: true })
   subscription_details: Record<string, any>;
 
+  @Column({ type: 'varchar', nullable: true, name: 'stripe_customer_id' }) // Explicitly naming with underscore for DB
+  stripe_customer_id: string | null;
+
+  @Column({ type: 'varchar', nullable: true, name: 'stripe_subscription_id' })
+  stripe_subscription_id: string | null;
+
+  @Column({ type: 'varchar', nullable: true, name: 'stripe_payment_method_id' }) // Optional, for specific payment method tracking
+  stripe_payment_method_id: string | null;
+
+  @Column({ type: 'varchar', nullable: true, name: 'stripe_price_id' }) // To store the ID of the Stripe Price
+  stripe_price_id: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true, name: 'subscription_status' }) // e.g., 'active', 'past_due', 'canceled'
+  subscription_status: string | null;
+
   @CreateDateColumn()
   created_at: Date;
 

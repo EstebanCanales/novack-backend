@@ -7,6 +7,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
+import * as express from 'express'; // Import express
 import { StructuredLoggerService } from './infrastructure/logging/structured-logger.service';
 import { GlobalExceptionFilter } from './infrastructure/filters/global-exception.filter';
 
@@ -47,6 +48,10 @@ async function bootstrap() {
 
   // Aplicar helmet para seguridad de cabeceras HTTP
   app.use(helmet());
+
+  // Stripe webhook requires raw body. Apply this middleware specifically for the Stripe webhook route.
+  // It should be placed before any global JSON body parser if that might consume the stream first for this path.
+  app.use('/stripe/webhook', express.raw({type: 'application/json'}));
 
   // Configurar CSP para prevenir XSS
   app.use(
