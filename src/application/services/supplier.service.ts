@@ -66,6 +66,7 @@ export class SupplierService {
       has_card_subscription: createSupplierDto.has_card_subscription || false,
       has_sensor_subscription:
         createSupplierDto.has_sensor_subscription || false,
+      has_ai_feature_subscription: createSupplierDto.has_ai_feature_subscription || false,
       max_employee_count: createSupplierDto.employee_count || 0,
       max_card_count: createSupplierDto.card_count || 0,
       supplier: savedSupplier,
@@ -241,6 +242,10 @@ export class SupplierService {
       if (updateSupplierDto.has_sensor_subscription !== undefined)
         supplier.subscription.has_sensor_subscription =
           updateSupplierDto.has_sensor_subscription;
+      if (updateSupplierDto.has_ai_feature_subscription !== undefined) {
+        supplier.subscription.has_ai_feature_subscription =
+          updateSupplierDto.has_ai_feature_subscription;
+      }
       if (updateSupplierDto.employee_count !== undefined)
         supplier.subscription.max_employee_count =
           updateSupplierDto.employee_count;

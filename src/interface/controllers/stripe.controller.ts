@@ -4,13 +4,18 @@ import { Request, Response } from 'express';
 import { StripeService } from '../../application/services/stripe.service'; // Adjust path
 import { StructuredLoggerService } from '../../infrastructure/logging/structured-logger.service'; // Adjust path
 import { Public } from '../../application/decorators/public.decorator'; // For public webhook endpoint
+import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
 
 // DTO for checkout session request
 class CreateCheckoutSessionDto {
+  @IsNotEmpty({ message: 'Supplier ID should not be empty.' })
+  @IsUUID('4', { message: 'Supplier ID must be a valid UUID.' })
   supplierId: string;
-  priceId: string; // Stripe Price ID
-  // successUrl: string; // Optional: client can construct this or server can enforce
-  // cancelUrl: string; // Optional
+
+  @IsNotEmpty({ message: 'Price ID should not be empty.' })
+  @IsString({ message: 'Price ID must be a string.' })
+  // Add more specific validation if Stripe Price IDs have a known format/prefix e.g. @Matches(/^price_/)
+  priceId: string;
 }
 
 @Controller('stripe')

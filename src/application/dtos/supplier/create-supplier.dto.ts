@@ -98,6 +98,15 @@ export class CreateSupplierDto {
 	@IsBoolean()
 	has_sensor_subscription: boolean;
 
+	@ApiPropertyOptional({
+		description: 'Indica si el proveedor tiene suscripción a funcionalidades de IA',
+		example: false,
+		default: false
+	})
+	@IsOptional()
+	@IsBoolean()
+	has_ai_feature_subscription?: boolean;
+
 	@ApiProperty({ 
 		description: 'Número de empleados del proveedor',
 		example: 5,

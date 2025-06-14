@@ -102,6 +102,15 @@ export class UpdateSupplierDto {
 	has_sensor_subscription?: boolean;
 
 	@ApiPropertyOptional({
+		description: 'Indica si el proveedor tiene suscripción a funcionalidades de IA',
+		example: false
+	})
+	@IsOptional()
+	@IsBoolean()
+	// @ValidateIf((o) => o.is_subscribed === true || o.is_subscribed === undefined) // Decide if this validation is needed
+	has_ai_feature_subscription?: boolean;
+
+	@ApiPropertyOptional({
 		description: 'Cantidad de tarjetas permitidas',
 		example: 50
 	})

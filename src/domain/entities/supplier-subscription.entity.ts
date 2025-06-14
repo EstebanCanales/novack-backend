@@ -38,6 +38,9 @@ export class SupplierSubscription {
   @Column({ type: 'jsonb', nullable: true })
   subscription_details: Record<string, any>;
 
+  @Column({ type: 'boolean', default: false, name: 'has_ai_feature_subscription' })
+  has_ai_feature_subscription: boolean;
+
   @Column({ type: 'varchar', nullable: true, name: 'stripe_customer_id' }) // Explicitly naming with underscore for DB
   stripe_customer_id: string | null;
 

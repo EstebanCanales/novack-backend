@@ -5,43 +5,83 @@ import { StripeService } from '../../application/services/stripe.service';
 import { StructuredLoggerService } from '../../infrastructure/logging/structured-logger.service';
 import { HttpStatus } from '@nestjs/common';
 import { Request, Response } from 'express';
+import Stripe from 'stripe'; // Import Stripe type for mockStripeEvent
 
-// Mocks
-const mockStripeService = {
+// --- Mock Data Definitions ---
+const mockCheckoutDto = { supplierId: 'sup_1a2b3c', priceId: 'price_4d5e6f' };
+const mockSessionId = 'cs_test_session_12345';
+const mockStripeEventBase: Partial<Stripe.Event> = {
+    id: 'evt_test_webhook_event',
+    object: 'event',
+    api_version: '2023-10-16', // Match the version used in StripeService
+    created: Math.floor(Date.now() / 1000),
+    livemode: false,
+    pending_webhooks: 0,
+    request: { id: null, idempotency_key: null },
+};
+const mockWebhookPayload = {
+  type: 'checkout.session.completed',
+  data: { object: { id: 'cs_123', /* other checkout session data */ } },
+};
+const mockStripeValidEvent: Stripe.Event = {
+  ...mockStripeEventBase,
+  type: 'checkout.session.completed',
+  data: { object: mockWebhookPayload.data.object as any },
+} as Stripe.Event;
+
+
+// --- Mock Implementations ---
+const mockStripeServiceImpl = {
   createCheckoutSession: jest.fn(),
   handleWebhookEvent: jest.fn(),
 };
 
-const mockConfigService = {
+const mockConfigServiceImpl = {
   get: jest.fn((key: string) => {
     if (key === 'CLIENT_APP_URL') return 'http://localhost:3001';
     return null;
   }),
 };
 
-const mockLoggerService = {
+const mockLoggerServiceImpl = {
   setContext: jest.fn(),
   log: jest.fn(),
   error: jest.fn(),
   warn: jest.fn(),
 };
+// --- End Mock Implementations ---
 
 describe('StripeController', () => {
   let controller: StripeController;
-  let stripeService: typeof mockStripeService;
+  let stripeService: typeof mockStripeServiceImpl;
+  // No need to get configService or loggerService from module if only used for providing mocks
+
+  let mockResponse: Partial<Response>;
+  let mockRequest: Partial<Request>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [StripeController],
       providers: [
-        { provide: StripeService, useValue: mockStripeService },
-        { provide: ConfigService, useValue: mockConfigService },
-        { provide: StructuredLoggerService, useValue: mockLoggerService },
+        { provide: StripeService, useValue: mockStripeServiceImpl },
+        { provide: ConfigService, useValue: mockConfigServiceImpl },
+        { provide: StructuredLoggerService, useValue: mockLoggerServiceImpl },
       ],
     }).compile();
 
     controller = module.get<StripeController>(StripeController);
-    stripeService = module.get<typeof mockStripeService>(StripeService);
+    stripeService = module.get<typeof mockStripeServiceImpl>(StripeService);
+
+    mockResponse = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+      send: jest.fn().mockReturnThis(),
+    };
+    mockRequest = { // Initialize mockRequest here for use in webhook tests
+        headers: {},
+        // rawBody will be set per test case for webhook tests
+    };
+
     jest.clearAllMocks();
   });
 
@@ -49,126 +89,114 @@ describe('StripeController', () => {
     expect(controller).toBeDefined();
   });
 
-  describe('POST /checkout/session', () => {
-    let mockResponse: Partial<Response>;
-
-    beforeEach(() => {
-        mockResponse = {
-            status: jest.fn().mockReturnThis(),
-            json: jest.fn().mockReturnThis(),
-        };
-    });
-
+  describe('POST /checkout/session (createCheckoutSession)', () => {
     it('should successfully create a checkout session and return session ID', async () => {
-      const checkoutDto = { supplierId: 'sup_123', priceId: 'price_abc' };
-      const sessionMock = { id: 'cs_test_session_id' };
-      stripeService.createCheckoutSession.mockResolvedValueOnce(sessionMock as any);
+      stripeService.createCheckoutSession.mockResolvedValueOnce({ id: mockSessionId } as any);
 
-      await controller.createCheckoutSession(checkoutDto, mockResponse as Response);
+      await controller.createCheckoutSession(mockCheckoutDto, mockResponse as Response);
 
       expect(stripeService.createCheckoutSession).toHaveBeenCalledWith(
-        checkoutDto.supplierId,
-        checkoutDto.priceId,
-        'http://localhost:3001/payment/success?session_id={CHECKOUT_SESSION_ID}',
-        'http://localhost:3001/payment/cancel',
+        mockCheckoutDto.supplierId,
+        mockCheckoutDto.priceId,
+        `http://localhost:3001/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+        `http://localhost:3001/payment/cancel`,
       );
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.CREATED);
-      expect(mockResponse.json).toHaveBeenCalledWith({ sessionId: sessionMock.id });
-      // TODO: Add more detailed assertions
+      expect(mockResponse.json).toHaveBeenCalledWith({ sessionId: mockSessionId });
     });
 
-    it('should return 400 if supplierId or priceId is missing', async () => {
-      await controller.createCheckoutSession({ supplierId: '', priceId: 'price_abc' }, mockResponse as Response);
+    it('should return 400 if supplierId is missing (controller level check)', async () => {
+      // This tests the controller's explicit check. ValidationPipe would normally handle this.
+      const dtoWithMissingSupplierId = { ...mockCheckoutDto, supplierId: '' };
+      await controller.createCheckoutSession(dtoWithMissingSupplierId, mockResponse as Response);
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
       expect(mockResponse.json).toHaveBeenCalledWith({ message: 'supplierId and priceId are required.' });
+    });
 
-      await controller.createCheckoutSession({ supplierId: 'sup_123', priceId: '' }, mockResponse as Response);
+    it('should return 400 if priceId is missing (controller level check)', async () => {
+      const dtoWithMissingPriceId = { ...mockCheckoutDto, priceId: '' };
+      await controller.createCheckoutSession(dtoWithMissingPriceId, mockResponse as Response);
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
       expect(mockResponse.json).toHaveBeenCalledWith({ message: 'supplierId and priceId are required.' });
-      // TODO: Add more detailed assertions
     });
 
     it('should return 500 if stripeService.createCheckoutSession throws an error', async () => {
-      const checkoutDto = { supplierId: 'sup_123', priceId: 'price_abc' };
-      stripeService.createCheckoutSession.mockRejectedValueOnce(new Error('Service error'));
+      const serviceError = new Error('Stripe service error');
+      stripeService.createCheckoutSession.mockRejectedValueOnce(serviceError);
 
-      await controller.createCheckoutSession(checkoutDto, mockResponse as Response);
+      await controller.createCheckoutSession(mockCheckoutDto, mockResponse as Response);
 
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
       expect(mockResponse.json).toHaveBeenCalledWith({ message: 'Failed to create checkout session.' });
-      // TODO: Add more detailed assertions
+      expect(mockLoggerServiceImpl.error).toHaveBeenCalledWith(
+        `Error creating checkout session: ${serviceError.message}`,
+        serviceError.stack,
+        { supplierId: mockCheckoutDto.supplierId }
+      );
     });
   });
 
-  describe('POST /webhook', () => {
-    let mockRequest: Partial<Request>;
-    let mockResponse: Partial<Response>;
-
-    beforeEach(() => {
-        mockRequest = {
-            headers: {},
-        };
-        mockResponse = {
-            status: jest.fn().mockReturnThis(),
-            send: jest.fn().mockReturnThis(),
-            json: jest.fn().mockReturnThis(),
-        };
-    });
+  describe('POST /webhook (handleWebhook)', () => {
+    const validSignature = 'valid_stripe_signature';
+    const rawBodyPayload = Buffer.from(JSON.stringify(mockWebhookPayload));
 
     it('should successfully process a valid webhook event', async () => {
-      mockRequest.headers['stripe-signature'] = 'valid_signature';
-      (mockRequest as any).rawBody = Buffer.from('{"event": "test"}');
-      stripeService.handleWebhookEvent.mockResolvedValueOnce({ id: 'evt_test', type: 'test.event' } as any);
+      mockRequest.headers['stripe-signature'] = validSignature;
+      mockRequest.rawBody = rawBodyPayload;
+      stripeService.handleWebhookEvent.mockResolvedValueOnce(mockStripeValidEvent as any);
 
-      await controller.handleWebhook('valid_signature', mockRequest as Request, mockResponse as Response);
+      await controller.handleWebhook(validSignature, mockRequest as Request, mockResponse as Response);
 
-      expect(stripeService.handleWebhookEvent).toHaveBeenCalledWith(Buffer.from('{"event": "test"}'), 'valid_signature');
+      expect(stripeService.handleWebhookEvent).toHaveBeenCalledWith(rawBodyPayload, validSignature);
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.OK);
       expect(mockResponse.json).toHaveBeenCalledWith({ received: true });
-      // TODO: Add more detailed assertions
     });
 
     it('should return 400 if stripe-signature is missing', async () => {
-      (mockRequest as any).rawBody = Buffer.from('{"event": "test"}');
+      mockRequest.rawBody = rawBodyPayload;
+      // Signature is undefined when calling controller.handleWebhook
       await controller.handleWebhook(undefined, mockRequest as Request, mockResponse as Response);
+
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
       expect(mockResponse.send).toHaveBeenCalledWith('Missing Stripe signature.');
-      // TODO: Add more detailed assertions
+      expect(stripeService.handleWebhookEvent).not.toHaveBeenCalled();
     });
 
     it('should return 500 if req.rawBody is not available', async () => {
-        mockRequest.headers['stripe-signature'] = 'valid_signature';
-        (mockRequest as any).rawBody = undefined; // Simulate rawBody not being available
-        await controller.handleWebhook('valid_signature', mockRequest as Request, mockResponse as Response);
+        mockRequest.headers['stripe-signature'] = validSignature;
+        mockRequest.rawBody = undefined; // Simulate rawBody not being available
+
+        await controller.handleWebhook(validSignature, mockRequest as Request, mockResponse as Response);
+
         expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
         expect(mockResponse.send).toHaveBeenCalledWith('Server configuration error for raw body.');
-        // TODO: Add more detailed assertions
+        expect(stripeService.handleWebhookEvent).not.toHaveBeenCalled();
     });
 
     it('should return 400 if StripeService throws StripeSignatureVerificationError', async () => {
       mockRequest.headers['stripe-signature'] = 'invalid_signature';
-      (mockRequest as any).rawBody = Buffer.from('{"event": "test"}');
-      const sigError = new Error('Signature verification failed');
-      (sigError as any).type = 'StripeSignatureVerificationError';
+      mockRequest.rawBody = rawBodyPayload;
+
+      const sigError = new Error('Invalid Signature');
+      (sigError as any).type = 'StripeSignatureVerificationError'; // Mimic Stripe error type
       stripeService.handleWebhookEvent.mockRejectedValueOnce(sigError);
 
       await controller.handleWebhook('invalid_signature', mockRequest as Request, mockResponse as Response);
 
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
-      expect(mockResponse.send).toHaveBeenCalledWith('Webhook Error: Signature verification failed');
-      // TODO: Add more detailed assertions
+      expect(mockResponse.send).toHaveBeenCalledWith(`Webhook Error: ${sigError.message}`);
     });
 
     it('should return 500 if StripeService throws other errors', async () => {
-      mockRequest.headers['stripe-signature'] = 'valid_signature';
-      (mockRequest as any).rawBody = Buffer.from('{"event": "test"}');
-      stripeService.handleWebhookEvent.mockRejectedValueOnce(new Error('Some other service error'));
+      mockRequest.headers['stripe-signature'] = validSignature;
+      mockRequest.rawBody = rawBodyPayload;
+      const otherError = new Error('Webhook processing error');
+      stripeService.handleWebhookEvent.mockRejectedValueOnce(otherError);
 
-      await controller.handleWebhook('valid_signature', mockRequest as Request, mockResponse as Response);
+      await controller.handleWebhook(validSignature, mockRequest as Request, mockResponse as Response);
 
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
-      expect(mockResponse.send).toHaveBeenCalledWith('Webhook Error: Some other service error');
-      // TODO: Add more detailed assertions
+      expect(mockResponse.send).toHaveBeenCalledWith(`Webhook Error: ${otherError.message}`);
     });
   });
 });
