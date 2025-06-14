@@ -7,6 +7,7 @@ import { EmailService } from "../services/email.service";
 import { EmployeeModule } from "./employee.module";
 import { FileStorageModule } from './file-storage.module';
 import { ImageProcessingPipe } from '../pipes/image-processing.pipe';
+import { StripeModule } from "./stripe/stripe.module"; // Import StripeModule
 import { TokenModule } from "./token.module";
 import { ISupplierRepository } from "../../domain/repositories/supplier.repository.interface";
 import { SupplierRepository } from "../../infrastructure/repositories/supplier.repository";
@@ -15,6 +16,7 @@ import { SupplierRepository } from "../../infrastructure/repositories/supplier.r
 	imports: [
 		TypeOrmModule.forFeature([Supplier, SupplierSubscription]),
 		forwardRef(() => EmployeeModule),
+		forwardRef(() => StripeModule), // Add StripeModule here
 		TokenModule,
 		FileStorageModule,
 	],

@@ -8,6 +8,7 @@ import { CreateSupplierDto, UpdateSupplierDto } from '../../dtos/supplier';
 import { EmployeeService } from '../employee.service';
 import { EmailService } from '../email.service';
 import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service'; // Import Logger
+import { StripeService } from '../stripe.service'; // Import StripeService
 
 describe('SupplierService', () => {
   let service: SupplierService;
@@ -16,6 +17,7 @@ describe('SupplierService', () => {
   let employeeService: EmployeeService;
   let emailService: EmailService;
   let logger: StructuredLoggerService; // Declare logger
+  let stripeService: StripeService; // Declare StripeService
 
   // Define the mock logger instance
   const mockLoggerInstance = {
@@ -88,6 +90,11 @@ describe('SupplierService', () => {
       sendSupplierCreationEmail: jest.fn().mockResolvedValue(true),
     };
 
+    const mockStripeService = {
+      findOrCreateCustomer: jest.fn(),
+      // Add other StripeService methods if directly called and need mocking in other tests
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SupplierService,
@@ -123,6 +130,10 @@ describe('SupplierService', () => {
           provide: StructuredLoggerService, // Provide logger
           useValue: mockLoggerInstance,
         },
+        {
+          provide: StripeService, // Provide StripeService
+          useValue: mockStripeService,
+        }
       ],
     }).compile();
 
@@ -132,6 +143,7 @@ describe('SupplierService', () => {
     employeeService = module.get<EmployeeService>(EmployeeService);
     emailService = module.get<EmailService>(EmailService);
     logger = module.get<StructuredLoggerService>(StructuredLoggerService); // Get logger instance
+    stripeService = module.get<StripeService>(StripeService); // Get StripeService instance
   });
 
   it('should be defined', () => {
@@ -391,4 +403,192 @@ describe('SupplierService', () => {
       await expect(service.updateProfileImageUrl('1', newImageUrl)).rejects.toThrow(BadRequestException);
     });
   });
-}); 
+
+  // New describe block for Stripe related functionalities
+  describe('Stripe Integration', () => {
+    describe('create method with Stripe', () => {
+      const createDtoSubscribed: CreateSupplierDto = {
+        ...mockCreateSupplierDto,
+        is_subscribed: true,
+      };
+      const createDtoNotSubscribed: CreateSupplierDto = {
+        ...mockCreateSupplierDto,
+        is_subscribed: false,
+      };
+      const mockSavedSupplier = { ...mockSupplier, id: 'new_sup_id' };
+      const mockSavedSubscription = { ...mockSubscription, id: 'new_sub_id', supplier: mockSavedSupplier, is_subscribed: true, stripe_customer_id: null };
+      const mockStripeCustomer = { id: 'cus_xyz123' };
+
+      beforeEach(() => {
+        // Common mocks for create successful path
+        jest.spyOn(supplierRepository, 'findOne').mockResolvedValue(null); // No existing supplier by name
+        jest.spyOn(supplierRepository, 'create').mockReturnValue(mockSavedSupplier as any);
+        jest.spyOn(supplierRepository, 'save').mockResolvedValue(mockSavedSupplier as any);
+        jest.spyOn(subscriptionRepository, 'create').mockReturnValue(mockSavedSubscription as any);
+        // Mock the save on subscriptionRepository to return the object that would be saved
+        jest.spyOn(subscriptionRepository, 'save')
+            .mockImplementation(async (sub) => sub as any); // Returns the passed subscription
+
+        jest.spyOn(employeeService, 'create').mockResolvedValue({ id: 'emp_id' } as any);
+        jest.spyOn(emailService, 'sendSupplierCreationEmail').mockResolvedValue(true as any);
+         // Mock for the findOne call at the end of the create method
+        jest.spyOn(service, 'findOne').mockResolvedValue(mockSavedSupplier as any);
+      });
+
+      it('should call stripeService.findOrCreateCustomer if is_subscribed is true', async () => {
+        (stripeService.findOrCreateCustomer as jest.Mock).mockResolvedValueOnce(mockStripeCustomer);
+
+        await service.create(createDtoSubscribed);
+
+        expect(stripeService.findOrCreateCustomer).toHaveBeenCalledWith(
+          mockSavedSupplier.contact_email,
+          mockSavedSupplier.supplier_name,
+          mockSavedSupplier.id,
+        );
+      });
+
+      it('should save stripe_customer_id to the subscription if is_subscribed is true and customer created', async () => {
+        (stripeService.findOrCreateCustomer as jest.Mock).mockResolvedValueOnce(mockStripeCustomer);
+
+        await service.create(createDtoSubscribed);
+
+        // Verify that subscriptionRepository.save was called with the stripe_customer_id
+        // The first call to save is for the initial subscription, second is after stripe_customer_id is set.
+        expect(subscriptionRepository.save).toHaveBeenCalledTimes(2); // Initial save, then save with stripe_customer_id
+        expect(subscriptionRepository.save).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            id: mockSavedSubscription.id, // Ensure it's the same subscription object
+            stripe_customer_id: mockStripeCustomer.id,
+          }),
+        );
+      });
+
+      it('should not call stripeService.findOrCreateCustomer if is_subscribed is false', async () => {
+        await service.create(createDtoNotSubscribed);
+        expect(stripeService.findOrCreateCustomer).not.toHaveBeenCalled();
+      });
+
+      it('should handle errors from stripeService.findOrCreateCustomer gracefully and log them', async () => {
+        const stripeError = new Error('Stripe API error');
+        (stripeService.findOrCreateCustomer as jest.Mock).mockRejectedValueOnce(stripeError);
+
+        await service.create(createDtoSubscribed); // Should not throw, but log error
+
+        expect(logger.error).toHaveBeenCalledWith(
+          `Failed to create/link Stripe customer for supplier ${mockSavedSupplier.id}: ${stripeError.message}`,
+          stripeError.stack
+        );
+         // Ensure subscription is still saved once (initial save)
+        expect(subscriptionRepository.save).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('activateSubscription', () => {
+      const supplierId = 'sup_1';
+      const stripeSubscriptionId = 'sub_stripe_1';
+      const stripePriceId = 'price_1';
+      const stripeCustomerId = 'cus_1';
+      const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+
+      const mockExistingSupplier = {
+        ...mockSupplier,
+        id: supplierId,
+        subscription: { ...mockSubscription, id: 'sub_local_1', is_subscribed: false, stripe_customer_id: null } as SupplierSubscription,
+      };
+
+      it('should correctly update subscription fields and save', async () => {
+        jest.spyOn(service, 'findOne').mockResolvedValueOnce(mockExistingSupplier as any);
+        jest.spyOn(subscriptionRepository, 'save').mockImplementation(async (sub) => sub as any);
+
+        const result = await service.activateSubscription(supplierId, stripeSubscriptionId, stripePriceId, stripeCustomerId, endDate, 'active');
+
+        expect(subscriptionRepository.save).toHaveBeenCalledWith(expect.objectContaining({
+          is_subscribed: true,
+          stripe_subscription_id: stripeSubscriptionId,
+          stripe_price_id: stripePriceId,
+          stripe_customer_id: stripeCustomerId,
+          subscription_end_date: endDate,
+          subscription_status: 'active',
+          subscription_start_date: expect.any(Date),
+        }));
+        expect(result.is_subscribed).toBe(true);
+        expect(result.stripe_subscription_id).toBe(stripeSubscriptionId);
+      });
+
+      it('should throw error if supplier or subscription record not found', async () => {
+        jest.spyOn(service, 'findOne').mockResolvedValueOnce({ ...mockExistingSupplier, subscription: null } as any);
+        await expect(service.activateSubscription(supplierId, stripeSubscriptionId, stripePriceId, stripeCustomerId, endDate))
+          .rejects.toThrow(`Supplier ${supplierId} has no subscription record.`);
+      });
+    });
+
+    describe('updateSubscriptionPaymentDetails', () => {
+      const stripeSubId = 'sub_stripe_xyz';
+      const newEndDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000); // 60 days
+      const newStatus = 'active_renewed';
+      const mockSubToUpdate = {
+        ...mockSubscription,
+        id: 'local_sub_xyz',
+        stripe_subscription_id: stripeSubId,
+        subscription_end_date: new Date(),
+        subscription_status: 'active'
+      };
+
+      it('should correctly update subscription_end_date and subscription_status', async () => {
+        jest.spyOn(subscriptionRepository, 'findOne').mockResolvedValueOnce(mockSubToUpdate as any);
+        jest.spyOn(subscriptionRepository, 'save').mockImplementation(async (sub) => sub as any);
+
+        const result = await service.updateSubscriptionPaymentDetails(stripeSubId, newEndDate, newStatus);
+
+        expect(subscriptionRepository.findOne).toHaveBeenCalledWith({ where: { stripe_subscription_id: stripeSubId } });
+        expect(subscriptionRepository.save).toHaveBeenCalledWith(expect.objectContaining({
+          id: mockSubToUpdate.id,
+          subscription_end_date: newEndDate,
+          subscription_status: newStatus,
+        }));
+        expect(result.subscription_end_date).toEqual(newEndDate);
+        expect(result.subscription_status).toBe(newStatus);
+      });
+       it('should return null if no local subscription found for Stripe ID', async () => {
+        jest.spyOn(subscriptionRepository, 'findOne').mockResolvedValueOnce(null);
+        const result = await service.updateSubscriptionPaymentDetails(stripeSubId, newEndDate, newStatus);
+        expect(result).toBeNull();
+        expect(logger.warn).toHaveBeenCalledWith(`Cannot update payment details: No local subscription found for Stripe ID ${stripeSubId}`);
+      });
+    });
+
+    describe('deactivateSubscription', () => {
+      const stripeSubId = 'sub_stripe_abc';
+      const reason = 'payment_failed_final';
+       const mockSubToDeactivate = {
+        ...mockSubscription,
+        id: 'local_sub_abc',
+        stripe_subscription_id: stripeSubId,
+        is_subscribed: true,
+        subscription_status: 'active'
+      };
+
+      it('should correctly update is_subscribed and subscription_status', async () => {
+        jest.spyOn(subscriptionRepository, 'findOne').mockResolvedValueOnce(mockSubToDeactivate as any);
+        jest.spyOn(subscriptionRepository, 'save').mockImplementation(async (sub) => sub as any);
+
+        const result = await service.deactivateSubscription(stripeSubId, reason);
+
+        expect(subscriptionRepository.findOne).toHaveBeenCalledWith({ where: { stripe_subscription_id: stripeSubId } });
+        expect(subscriptionRepository.save).toHaveBeenCalledWith(expect.objectContaining({
+          id: mockSubToDeactivate.id,
+          is_subscribed: false,
+          subscription_status: reason,
+        }));
+        expect(result.is_subscribed).toBe(false);
+        expect(result.subscription_status).toBe(reason);
+      });
+      it('should return null if no local subscription found for Stripe ID', async () => {
+        jest.spyOn(subscriptionRepository, 'findOne').mockResolvedValueOnce(null);
+        const result = await service.deactivateSubscription(stripeSubId, reason);
+        expect(result).toBeNull();
+        expect(logger.warn).toHaveBeenCalledWith(`Cannot deactivate: No local subscription found for Stripe ID ${stripeSubId}`);
+      });
+    });
+  });
+});

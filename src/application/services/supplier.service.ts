@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EmployeeService } from './employee.service';
 import { EmailService } from './email.service';
 import { StructuredLoggerService } from 'src/infrastructure/logging/structured-logger.service'; // Added import
+import { StripeService } from './stripe.service';
 
 @Injectable()
 export class SupplierService {
@@ -21,6 +22,8 @@ export class SupplierService {
     private readonly employeeService: EmployeeService,
     private readonly emailService: EmailService,
     private readonly logger: StructuredLoggerService, // Added logger
+    @Inject(forwardRef(() => StripeService))
+    private readonly stripeService: StripeService,
   ) {
     this.logger.setContext('SupplierService'); // Set context
   }
@@ -68,7 +71,32 @@ export class SupplierService {
       supplier: savedSupplier,
     });
 
-    await this.subscriptionRepository.save(subscription);
+    const savedSubscription = await this.subscriptionRepository.save(subscription);
+
+    this.logger.log('Supplier and initial subscription created successfully', undefined, { // Updated log message
+      supplierId: savedSupplier.id,
+      subscriptionId: savedSubscription.id, // Added subscription ID to log
+      supplierName: savedSupplier.supplier_name,
+    });
+
+    // Link Stripe customer if subscribed
+    if (savedSupplier && savedSubscription.is_subscribed) {
+      try {
+        const customer = await this.stripeService.findOrCreateCustomer(
+          savedSupplier.contact_email,
+          savedSupplier.supplier_name,
+          savedSupplier.id,
+        );
+        if (customer) {
+          savedSubscription.stripe_customer_id = customer.id;
+          await this.subscriptionRepository.save(savedSubscription); // Save updated subscription
+          this.logger.log(`Stripe customer ${customer.id} linked to supplier ${savedSupplier.id} and subscription ${savedSubscription.id}`);
+        }
+      } catch (error) {
+        this.logger.error(`Failed to create/link Stripe customer for supplier ${savedSupplier.id}: ${error.message}`, error.stack);
+        // Decide if this error should be fatal or just logged. For now, log and continue.
+      }
+    }
 
     this.logger.log('Supplier created successfully', undefined, {
       supplierId: savedSupplier.id,
@@ -263,5 +291,81 @@ export class SupplierService {
       newImageUrl: imageUrl,
     });
     return supplier; // Opcional: devolver el proveedor actualizado
+  }
+
+  // Methods for Stripe Webhook Event Handling
+
+  async updateStripeCustomerId(supplierId: string, stripeCustomerId: string): Promise<SupplierSubscription> {
+    const supplier = await this.findOne(supplierId); // Ensures supplier exists and loads subscription
+    if (!supplier.subscription) {
+      this.logger.error(`Supplier ${supplierId} does not have a subscription record to update stripe_customer_id.`);
+      throw new Error(`Supplier ${supplierId} does not have a subscription record.`);
+    }
+    supplier.subscription.stripe_customer_id = stripeCustomerId;
+    this.logger.log(`Updating Stripe Customer ID for supplier ${supplierId} to ${stripeCustomerId}`);
+    return this.subscriptionRepository.save(supplier.subscription);
+  }
+
+  async activateSubscription(
+    supplierId: string,
+    stripeSubscriptionId: string,
+    stripePriceId: string,
+    stripeCustomerId: string,
+    subscriptionEndDate: Date,
+    status: string = 'active',
+  ): Promise<SupplierSubscription> {
+    this.logger.log(`Activating subscription for supplier ${supplierId} with Stripe ID ${stripeSubscriptionId}`);
+    const supplier = await this.findOne(supplierId);
+    if (!supplier.subscription) {
+      this.logger.error(`Cannot activate subscription: Supplier ${supplierId} has no subscription record.`);
+      throw new Error(`Supplier ${supplierId} has no subscription record.`);
+    }
+
+    const sub = supplier.subscription;
+    sub.is_subscribed = true;
+    sub.stripe_subscription_id = stripeSubscriptionId;
+    sub.stripe_price_id = stripePriceId;
+    sub.stripe_customer_id = stripeCustomerId;
+    sub.subscription_end_date = subscriptionEndDate;
+    sub.subscription_start_date = new Date();
+    sub.subscription_status = status;
+
+    this.logger.log(`Local subscription for supplier ${supplierId} updated. Stripe ID: ${stripeSubscriptionId}, Status: ${status}, End Date: ${subscriptionEndDate}`);
+    return this.subscriptionRepository.save(sub);
+  }
+
+  async updateSubscriptionPaymentDetails(
+    stripeSubscriptionId: string,
+    newSubscriptionEndDate: Date,
+    status: string,
+  ): Promise<SupplierSubscription | null> {
+    this.logger.log(`Updating payment details for Stripe subscription ${stripeSubscriptionId}. New end date: ${newSubscriptionEndDate}, Status: ${status}`);
+    const subscription = await this.subscriptionRepository.findOne({ where: { stripe_subscription_id: stripeSubscriptionId } });
+    if (!subscription) {
+      this.logger.warn(`Cannot update payment details: No local subscription found for Stripe ID ${stripeSubscriptionId}`);
+      return null;
+    }
+    subscription.subscription_end_date = newSubscriptionEndDate;
+    subscription.subscription_status = status;
+
+    this.logger.log(`Local subscription ${subscription.id} (Stripe ID: ${stripeSubscriptionId}) updated. Status: ${status}, New End Date: ${newSubscriptionEndDate}`);
+    return this.subscriptionRepository.save(subscription);
+  }
+
+  async deactivateSubscription(
+    stripeSubscriptionId: string,
+    reason: string = 'cancelled',
+  ): Promise<SupplierSubscription | null> {
+    this.logger.log(`Deactivating subscription for Stripe ID ${stripeSubscriptionId} due to: ${reason}`);
+    const subscription = await this.subscriptionRepository.findOne({ where: { stripe_subscription_id: stripeSubscriptionId } });
+    if (!subscription) {
+      this.logger.warn(`Cannot deactivate: No local subscription found for Stripe ID ${stripeSubscriptionId}`);
+      return null;
+    }
+    subscription.is_subscribed = false;
+    subscription.subscription_status = reason;
+
+    this.logger.log(`Local subscription ${subscription.id} (Stripe ID: ${stripeSubscriptionId}) deactivated. Status: ${reason}`);
+    return this.subscriptionRepository.save(subscription);
   }
 }
